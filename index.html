@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ADP Rinner - Digitales Grenzprotokoll</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    
+    <style>
+        /* CORPORATE DESIGN: Rot, Schwarz, Grau, Weiß */
+        :root {
+            --adp-rot: #9b1b22;
+            --adp-schwarz: #1a1a1a;
+            --adp-grau-hell: #f3f4f6;
+            --adp-grau-dunkel: #4b5563;
+        }
+
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: var(--adp-grau-hell); color: var(--adp-schwarz); }
+        
+        /* ================= STARTBILDSCHIRM ================= */
+        #startScreen {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            /* Hintergrundbild für den Start */
+            background-image: url("Graz%20Jakomini%20Ausschnitt.jpg");
+            background-color: var(--adp-schwarz);
+            background-size: cover; background-position: center;
+            display: flex; justify-content: center; align-items: center; z-index: 9999;
+        }
+        #startScreen::before {
+            content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.65); z-index: -1;
+        }
+        .start-card {
+            background: rgba(255, 255, 255, 0.95); padding: 40px; border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8); text-align: center; max-width: 500px; width: 90%;
+            border-top: 6px solid var(--adp-rot);
+        }
+        .start-card img { max-width: 280px; margin-bottom: 25px; }
+        .start-card select {
+            width: 100%; padding: 12px; font-size: 1.1em; margin-bottom: 25px;
+            border: 2px solid #ccc; border-radius: 4px; background: white;
+        }
+        .btn-start {
+            background-color: var(--adp-rot); color: white; border: none; padding: 15px 30px;
+            font-size: 1.2em; font-weight: bold; border-radius: 4px; cursor: pointer; width: 100%;
+            transition: background 0.3s;
+        }
+        .btn-start:hover { background-color: #7a151b; }
+
+        /* ================= APP CONTAINER ================= */
+        #appScreen { display: none; padding: 20px; }
+        .container { max-width: 1000px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .header-kanzlei { text-align: center; border-bottom: 3px solid var(--adp-schwarz); padding-bottom: 15px; margin-bottom: 25px; }
+        .header-kanzlei img { max-width: 250px; height: auto; display: block; margin: 0 auto 10px auto; }
+        
+        .inline-input { padding: 8px; font-size: 1em; border-radius: 4px; border: 1px solid #ccc; }
+        .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; background: var(--adp-grau-hell); padding: 20px; border-radius: 6px; margin-bottom: 20px; border-left: 5px solid var(--adp-rot); }
+        
+        /* TABS */
+        .tab-nav { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 20px; border-bottom: 2px solid #ccc; padding-bottom: 10px; }
+        .tab-group-left { display: flex; gap: 5px; flex-wrap: wrap; }
+        .tab-btn { padding: 12px 18px; border: 1px solid #ccc; background: white; cursor: pointer; border-radius: 4px; font-weight: bold; color: var(--adp-grau-dunkel); }
+        .tab-btn.active { background: var(--adp-schwarz); color: white; border-color: var(--adp-schwarz); }
+        
+        .tab-btn-tool { background: #e2e8f0; color: #1e293b; border-color: #cbd5e1; }
+        .tab-btn-tool.active { background: #3b82f6; color: white; border-color: #2563eb; }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        
+        /* DKM IFRAME */
+        .iframe-container { width: 100%; height: 600px; border: 2px solid var(--adp-schwarz); border-radius: 4px; overflow: hidden; background: #fff; }
+        .iframe-container iframe { width: 100%; height: 100%; border: none; }
+
+        /* SKIZZE */
+        .skizze-wrapper { 
+            position: relative; width: 100%; max-width: 900px; height: 550px; 
+            border: 2px solid var(--adp-schwarz); background-color: #fff; 
+            background-image: url('Begehungsplan.jpg'); 
+            background-size: contain; background-repeat: no-repeat; background-position: center; 
+        }
+        
+        #sketchCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+        
+        .toolbar { margin-bottom: 15px; display: flex; gap: 8px; flex-wrap: wrap; background: #f8fafc; padding: 12px; border: 1px solid #e2e8f0; border-radius: 4px; }
+        .btn { padding: 8px 12px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 0.9em; }
+        .btn-tool { background-color: var(--adp-grau-dunkel); color: white; border: 1px solid transparent; }
+        .btn-tool.active { background-color: var(--adp-rot); box-shadow: inset 0 0 5px rgba(0,0,0,0.5); }
+        .btn-action { background-color: #666; color: white; }
+        .btn-save { background-color: var(--adp-rot); color: white; width: 100%; font-size: 1.2em; padding: 15px; margin-top: 30px; text-transform: uppercase; letter-spacing: 1px; }
+        
+        /* TABELLEN & SIGNATUR */
+        .sig-table, .behelf-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        .sig-table th, .sig-table td, .behelf-table th, .behelf-table td { border: 1px solid #ccc; padding: 10px; text-align: left; vertical-align: middle; }
+        .sig-table th, .behelf-table th { background-color: var(--adp-schwarz); color: white; font-size: 0.95em; }
+        
+        .sig-box-container { text-align: center; }
+        .sig-canvas { border: 1px dashed var(--adp-schwarz); background: #fafafa; display: inline-block; touch-action: none; }
+        
+        .info-text { font-size: 0.95em; line-height: 1.6; color: var(--adp-schwarz); background: var(--adp-grau-hell); padding: 15px; border-left: 4px solid var(--adp-schwarz); margin-bottom: 15px; }
+        .footnote { background: white; padding: 12px; font-size: 0.85em; margin-top: 10px; border: 1px solid #ccc; line-height: 1.5; color: var(--adp-grau-dunkel); }
+    </style>
+</head>
+<body>
+
+<div style="display: none;">
+    <img id="exportLogo" src="ADP_Logo.png" alt="Logo PDF">
+    <img id="exportBg" src="Begehungsplan.jpg" alt="Hintergrund PDF">
+</div>
+
+<div id="startScreen">
+    <div class="start-card">
+        <img src="ADP_Logo.png" alt="ADP Rinner Logo" onerror="this.style.display='none';">
+        <h3 style="margin-bottom: 20px; color: var(--adp-schwarz);">Digitale Grenzverhandlung</h3>
+        <select id="startGzSelect"></select>
+        <button class="btn-start" onclick="startVerhandlung()">Grenzverhandlung starten</button>
+    </div>
+</div>
+
+<div id="appScreen">
+    <div class="container">
+        <div class="header-kanzlei">
+            <img src="ADP_Logo.png" alt="VERMESSUNG ADP RINNER" onerror="this.style.display='none'">
+            <p style="color: var(--adp-grau-dunkel);">8010 Graz, Münzgrabenstraße 4, Tel. 0316 82 35 70</p>
+        </div>
+
+        <div class="tab-nav">
+            <div class="tab-group-left">
+                <button class="tab-btn active" id="btn-tab1" onclick="openTab('tab-seite1')">Seite 1: Eröffnung</button>
+                <button class="tab-btn" id="btn-tab2" onclick="openTab('tab-seite2')">Seite 2: Skizze</button>
+                <button class="tab-btn" id="btn-tab3" onclick="openTab('tab-seite3')">Seite 3: Signatur</button>
+            </div>
+            <div>
+                <button class="tab-btn tab-btn-tool" id="btn-tab-bev" onclick="openTab('tab-bev')">🗺️ DKM Kataster öffnen</button>
+            </div>
+        </div>
+
+        <div id="tab-seite1" class="tab-content active">
+            <h3 style="text-align: center; margin-bottom: 20px; color: var(--adp-rot);">Protokoll über die Festlegung des Grenzverlaufs<br><span style="color: var(--adp-schwarz); font-size: 0.8em;">gemäß § 43 Abs. 6 VermG und § 52 Z 5 VermG</span></h3>
+            
+            <div class="meta-grid">
+                <div><strong>Vermessungsamt:</strong> <span id="lblVA">-</span></div>
+                <div><strong>Katastralgemeinde:</strong> <span id="lblKG">-</span></div>
+                <div><strong>Projekt:</strong> <span id="lblProjekt">-</span></div>
+                <div><strong>Geschäftszahl (GZ):</strong> <span id="lblGZ" style="font-weight: bold; color: var(--adp-rot);">-</span></div>
+            </div>
+
+            <h4 style="border-bottom: 2px solid var(--adp-schwarz); padding-bottom: 5px;">Verzeichnis der Eigentümer, allfälliger Vertreter und anwesender Personen</h4>
+            <div class="info-text">
+                Die Verhandlung über den Grenzverlauf wird am 
+                <input type="date" id="txtDatumEroeffnung" class="inline-input" style="font-weight:bold;"> um 
+                <input type="time" id="txtUhrzeitEroeffnung" class="inline-input" style="font-weight:bold;"> Uhr in 
+                <input type="text" id="txtOrtEroeffnung" class="inline-input" style="font-weight:bold;"> eröffnet. 
+                Der Verhandlungsleiter überzeugt sich von der Persönlichkeit der anwesenden Personen und prüft die Vertretungsbefugnis.
+            </div>
+
+            <h4 style="border-bottom: 2px solid var(--adp-schwarz); padding-bottom: 5px;">Gegenstand der Verhandlung</h4>
+            <table class="behelf-table">
+                <thead>
+                    <tr><th style="width: 8%;">Aktiv</th><th>Planverfasser</th><th>Geschäftszahl</th><th>Anmerkung</th></tr>
+                </thead>
+                <tbody id="behelfeTableBody"></tbody>
+            </table>
+        </div>
+
+        <div id="tab-bev" class="tab-content">
+            <h4 style="border-bottom: 2px solid var(--adp-schwarz); padding-bottom: 5px;">Digitale Katastralmappe (BEV)</h4>
+            <p style="color: var(--adp-grau-dunkel); margin-bottom: 15px;">Nutzen Sie diesen Bereich zur Live-Recherche im Kataster. Dieser Bereich dient als Werkzeug und wird nicht ins Protokoll exportiert.</p>
+            <div class="iframe-container">
+                <iframe src="https://kataster.bev.gv.at/" title="BEV Kataster"></iframe>
+            </div>
+        </div>
+
+        <div id="tab-seite2" class="tab-content">
+            <h4 style="border-bottom: 2px solid var(--adp-schwarz); padding-bottom: 5px;">Beschreibung des Grenzverlaufs</h4>
+            <div class="info-text" style="border-left-color: var(--adp-rot);">
+                Der Verlauf der Grenzen wird von den erschienenen beteiligten Eigentümern oder deren bevollmächtigten Vertretern entsprechend der untenstehenden Skizze festgelegt und im Sinne von §845 ABGB und der Vermessungsverordnung i.d.g.F. gekennzeichnet.<br><br>
+                Die Grenze verläuft von Grenzpunkt zu Grenzpunkt geradlinig, sofern nichts anderes angegeben ist. Die zeichnerische Darstellung erfolgt unter Verwendung des im Anhang zur Vermessungsverordnung i.d.g.F. festgelegten Zeichenschlüssels.<br><br>
+                Wenn der Verlauf von Grenzabschnitten mangels Einigung der Eigentümer nicht festgelegt werden konnte, ist dies untenstehend beschrieben.<br><br>
+                Alte Grenzpunkte wurden aufgrund oben genannter GFN (VHW's) überprüft bzw. rückgesetzt und einvernehmlich anerkannt.<br>
+                Die neuen Grenzpunkte wurden ebenfalls einvernehmlich festgelegt und in der Natur vermarkt.
+            </div>
+
+            <p style="font-size: 1.1em;"><strong>Skizze <span style="color: var(--adp-rot);">(siehe Beilage)</span>:</strong></p>
+            
+            <div class="toolbar">
+                <strong>Linien: </strong>
+                <button class="btn btn-tool active" id="tool-line_solid" onclick="setTool('line_solid', '#000000', 2, [])">Unstrittig</button>
+                <button class="btn btn-tool" id="tool-line_new" onclick="setTool('line_new', '#9b1b22', 3, [])">Neu (Rot)</button>
+                <button class="btn btn-tool" id="tool-line_dash" onclick="setTool('line_dash', '#9b1b22', 2, [6, 6])">Strittig</button>
+                <span style="border-left: 2px solid #ccc; margin: 0 5px;"></span>
+                
+                <strong>Symbole & Text: </strong>
+                <button class="btn btn-tool" id="tool-sym_marke" onclick="setTool('sym_marke', '#000', 2, [])">⨁ Rohr/Marke</button>
+                <button class="btn btn-tool" id="tool-sym_kreis" onclick="setTool('sym_kreis', '#000', 2, [])">◯ Zaunsäule/Ecke</button>
+                <button class="btn btn-tool" id="tool-sym_stein" onclick="setTool('sym_stein', '#000', 2, [])">⚫ Grenzstein</button>
+                <button class="btn btn-tool" id="tool-text" onclick="setTool('text', '#9b1b22', 1, [])">A Text/Zahl</button>
+                
+                <span style="border-left: 2px solid #ccc; margin: 0 5px;"></span>
+                <button class="btn btn-action" onclick="clearCanvas('sketchCanvas')">Zeichnung leeren</button>
+            </div>
+
+            <div class="skizze-wrapper">
+                <canvas id="sketchCanvas" width="900" height="550"></canvas>
+            </div>
+        </div>
+
+        <div id="tab-seite3" class="tab-content">
+            <h4 style="border-bottom: 2px solid var(--adp-schwarz); padding-bottom: 5px;">Zustimmungserklärung</h4>
+            <div class="info-text">
+                Die im nachstehenden Verzeichnis unterfertigten Eigentümer stimmen dem in der Natur einvernehmlich festgelegten und oben beschriebenen Grenzverlauf zu.<br>
+                Weiters bestätigen die Eigentümer gem. § 43 Abs. 6 VermG und § 52 Z 5 VermG, dass der Grenzverlauf seit der letzten Vermessung unverändert geblieben ist, bzw. kein anderer Grenzverlauf bekannt ist.
+            </div>
+            
+            <table class="sig-table">
+                <thead>
+                    <tr>
+                        <th style="width: 8%;">EZ</th>
+                        <th style="width: 12%;">Gst.Nr.</th>
+                        <th style="width: 30%;">Name / Anschrift</th>
+                        <th style="width: 35%;">Unterschrift</th>
+                        <th style="width: 15%;">Anmerkung / ID</th>
+                    </tr>
+                </thead>
+                <tbody id="eigentuemerTableBody"></tbody>
+            </table>
+            
+            <div class="footnote">
+                <strong>* ID = Identitätsnachweis:</strong> P … persönlich bekannt, A … allgemein bekannt, L … amtlicher Lichtbildausweis<br>
+                <strong>Vollmachten:</strong> V.i.A. = Vollmacht im Akt; V.p.P. = Vollmacht per Post erhalten; V.p.E. = Vollmacht per Email erhalten
+            </div>
+
+            <div style="margin-top: 30px; background: white; padding: 20px; border-radius: 6px; border: 2px solid var(--adp-schwarz);">
+                <p style="margin-top: 0;">Die Verhandlung über den Verlauf der Grenze wird um <input type="time" id="txtUhrzeitSchliessung" class="inline-input"> Uhr geschlossen.</p>
+                <p style="margin-bottom: 0;"><input type="text" id="txtOrtSignatur" class="inline-input" style="font-weight:bold;">, am <span id="lblUnterschriftDatum" style="font-weight:bold;">-</span></p>
+                <p style="margin-top: 15px; text-align: right; border-top: 1px solid #ccc; padding-top: 10px;">
+                    <strong>DI Gerald Fuxjäger</strong><br>
+                    <small style="color: var(--adp-grau-dunkel);">Der Verhandlungsleiter</small>
+                </p>
+            </div>
+
+            <button class="btn btn-save" onclick="exportProtokollPDF()">Verhandlung schließen & PDF generieren</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const nameVerhandlungsleiter = "DI Gerald Fuxjäger";
+
+    const datenbank = [
+        { gz: "19100_000_Mustermann_Mustergasse", VA: "Graz", kg: "Graz-Stadt (63101)", projekt: "Grenzfeststellung", ort: "Graz", behelfe: [{verfasser: nameVerhandlungsleiter, gz: "GZ 456/1998", anm: "Westgrenze"}], eigentuemer: [{ez: "123", gst: "101/2", name: "Max Mustermann", adr: "Mustergasse 1", id: "P"}] },
+        { gz: "19101_000_Koller_Brucknerstrasse", VA: "Graz", kg: "Jakomini (63106)", projekt: "Teilung Koller", ort: "Graz", behelfe: [{verfasser: "DI Rinner", gz: "GZ 789/2012", anm: "Mappenberichtigung"}, {verfasser: nameVerhandlungsleiter, gz: "GZ 102/2021", anm: "Begehungsplan"}], eigentuemer: [{ez: "1592", gst: "2407/4", name: "Kasper Georg", adr: "Brucknerstraße 77", id: "L"}, {ez: "1856", gst: "2407/6", name: "Mohorka Elisabeth", adr: "Brucknerstraße 77", id: "V.i.A."}] },
+        { gz: "19102_000_Huber_Waldweg", VA: "Weiz", kg: "Anger (64201)", projekt: "Parzellierung", ort: "Anger", behelfe: [], eigentuemer: [{ez: "110", gst: "450/1", name: "Johann Huber", adr: "Waldweg 44", id: "A"}] },
+        { gz: "19103_000_Bauer_Feldgasse", VA: "Leoben", kg: "Göss (60304)", projekt: "Straßenabtretung", ort: "Leoben", behelfe: [], eigentuemer: [{ez: "99", gst: "12/4", name: "Anna Bauer", adr: "Feldgasse 2", id: "P"}] },
+        { gz: "19104_000_Steirer_Hauptplatz", VA: "Graz", kg: "Geidorf (63102)", projekt: "Berichtigung", ort: "Graz", behelfe: [], eigentuemer: [{ez: "55", gst: "88", name: "H. Steirer", adr: "Hauptplatz 1", id: "L"}] },
+        { gz: "19105_000_Gruber_Berggasse", VA: "Voitsberg", kg: "Bärnbach (63304)", projekt: "Hofteilung", ort: "Bärnbach", behelfe: [], eigentuemer: [{ez: "333", gst: "500", name: "F. Gruber", adr: "Berggasse 12", id: "P"}] },
+        { gz: "19106_000_Mayer_Talstrasse", VA: "Graz", kg: "Andritz (63104)", projekt: "Bauplatz", ort: "Graz", behelfe: [], eigentuemer: [{ez: "111", gst: "222", name: "G. Mayer", adr: "Talstr. 4", id: "A"}] },
+        { gz: "19107_000_Schmid_Ring", VA: "Graz", kg: "Jakomini (63106)", projekt: "Feststellung", ort: "Graz", behelfe: [], eigentuemer: [{ez: "77", gst: "33/1", name: "M. Schmid", adr: "Ring 10", id: "L"}] },
+        { gz: "19108_000_Wagner_Dorfplatz", VA: "Gleisdorf", kg: "Nitscha (64111)", projekt: "Verbreiterung", ort: "Gleisdorf", behelfe: [], eigentuemer: [{ez: "888", gst: "444", name: "T. Wagner", adr: "Dorfplatz 1", id: "P"}] },
+        { gz: "19109_000_Leitner_Grenzweg", VA: "Deutschlandsberg", kg: "Frauental (61005)", projekt: "Grenzbereinigung", ort: "Frauental", behelfe: [], eigentuemer: [{ez: "999", gst: "555", name: "L. Leitner", adr: "Grenzweg 3", id: "V.i.A."}] }
+    ];
+
+    let aktuellerFall = null;
+    let activeCanvasIds = [];
+
+    window.onload = function() {
+        if (typeof window.jspdf === 'undefined') {
+            alert("⚠️ ACHTUNG: jsPDF-Bibliothek lädt nicht. Für den Export ist eine Internetverbindung erforderlich.");
+        }
+        const startSelect = document.getElementById('startGzSelect');
+        datenbank.forEach((fall, index) => {
+            let opt = document.createElement('option'); opt.value = index;
+            opt.innerHTML = fall.gz; startSelect.appendChild(opt);
+        });
+        startSelect.value = 1; // Default: Brucknerstraße
+    };
+
+    function startVerhandlung() {
+        aktuellerFall = datenbank[document.getElementById('startGzSelect').value];
+        const now = new Date();
+        document.getElementById('txtDatumEroeffnung').value = now.toISOString().split('T')[0];
+        document.getElementById('lblUnterschriftDatum').innerText = now.toLocaleDateString('de-AT');
+        document.getElementById('txtUhrzeitEroeffnung').value = now.toTimeString().split(' ')[0].substring(0, 5);
+        document.getElementById('txtUhrzeitSchliessung').value = new Date(now.getTime() + 60*60000).toTimeString().split(' ')[0].substring(0, 5);
+
+        // Umschalten der Screens
+        document.getElementById('startScreen').style.display = 'none';
+        document.getElementById('appScreen').style.display = 'block';
+
+        // Befüllen der Daten
+        document.getElementById('lblGZ').innerText = aktuellerFall.gz;
+        document.getElementById('lblVA').innerText = aktuellerFall.VA;
+        document.getElementById('lblKG').innerText = aktuellerFall.kg;
+        document.getElementById('lblProjekt').innerText = aktuellerFall.projekt;
+        document.getElementById('txtOrtEroeffnung').value = aktuellerFall.ort;
+        document.getElementById('txtOrtSignatur').value = aktuellerFall.ort;
+
+        const bBody = document.getElementById('behelfeTableBody'); bBody.innerHTML = "";
+        if(aktuellerFall.behelfe.length === 0) {
+            bBody.innerHTML = "<tr><td colspan='4' style='text-align:center;'>Keine Behelfe hinterlegt</td></tr>";
+        } else {
+            aktuellerFall.behelfe.forEach((b, i) => {
+                bBody.innerHTML += `<tr><td><input type="checkbox" id="chkBehelf_${i}" checked></td><td>${b.verfasser}</td><td>${b.gz}</td><td>${b.anm}</td></tr>`;
+            });
+        }
+
+        const eBody = document.getElementById('eigentuemerTableBody'); eBody.innerHTML = "";
+        activeCanvasIds = [];
+        aktuellerFall.eigentuemer.forEach((e, i) => {
+            const cId = `sigCanvas_${i}`; activeCanvasIds.push(cId);
+            eBody.innerHTML += `
+                <tr>
+                    <td><strong>${e.ez}</strong></td>
+                    <td><strong>${e.gst}</strong></td>
+                    <td>${e.name}<br><small style="color:var(--adp-grau-dunkel);">${e.adr}</small></td>
+                    <td class="sig-box-container">
+                        <canvas id="${cId}" width="280" height="80" class="sig-canvas"></canvas>
+                        <br><button class="btn btn-clear" style="padding:4px 8px; font-size:0.75em; margin-top:5px;" onclick="clearCanvas('${cId}')">Leeren</button>
+                    </td>
+                    <td><input type="text" id="txtId_${i}" value="${e.id}" style="width:100%; padding:6px; box-sizing:border-box;"></td>
+                </tr>`;
+        });
+
+        // WICHTIG: Verzögertes Setup der Canvas-Elemente, damit diese korrekt gerendert sind.
+        setTimeout(() => { 
+            activeCanvasIds.forEach(id => setupCanvas(id, true)); 
+            setupCanvas('sketchCanvas', false);
+        }, 100);
+    }
+
+    function openTab(id) {
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        if(event) document.getElementById('btn-' + id.replace('tab-','')).classList.add('active');
+    }
+
+    // --- NEUE, STABILE CANVAS LOGIK (POINTER-EVENTS) ---
+    let currentTool = 'line_solid'; 
+    let currentStyle = { color: '#000000', width: 2, dash: [] };
+
+    function setTool(toolName, color, width, dash) {
+        currentTool = toolName;
+        currentStyle = { color: color, width: width, dash: dash };
+        document.querySelectorAll('.btn-tool').forEach(b => b.classList.remove('active'));
+        document.getElementById('tool-' + toolName).classList.add('active');
+    }
+
+    function setupCanvas(canvasId, isSig) {
+        const canvas = document.getElementById(canvasId); 
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d'); 
+        let drawing = false;
+
+        const getPos = (e) => { 
+            const rect = canvas.getBoundingClientRect(); 
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            return { 
+                x: (e.clientX - rect.left) * scaleX, 
+                y: (e.clientY - rect.top) * scaleY 
+            }; 
+        };
+        
+        const startAction = (e) => {
+            e.preventDefault();
+            const p = getPos(e);
+            
+            if (!isSig) {
+                if (currentTool === 'text') {
+                    const txt = prompt("Text oder Zahl eingeben:");
+                    if(txt) {
+                        ctx.font = "bold 16px Arial"; ctx.fillStyle = currentStyle.color;
+                        ctx.fillText(txt, p.x, p.y + 6);
+                    }
+                    return;
+                }
+                
+                if (currentTool.startsWith('sym_')) {
+                    ctx.strokeStyle = currentStyle.color; ctx.lineWidth = 2; ctx.beginPath();
+                    if (currentTool === 'sym_marke') {
+                        ctx.arc(p.x, p.y, 6, 0, 2 * Math.PI);
+                        ctx.moveTo(p.x - 8, p.y); ctx.lineTo(p.x + 8, p.y);
+                        ctx.moveTo(p.x, p.y - 8); ctx.lineTo(p.x, p.y + 8);
+                    } else if (currentTool === 'sym_kreis') {
+                        ctx.arc(p.x, p.y, 6, 0, 2 * Math.PI);
+                    } else if (currentTool === 'sym_stein') {
+                        ctx.arc(p.x, p.y, 6, 0, 2 * Math.PI);
+                        ctx.fillStyle = currentStyle.color; ctx.fill();
+                    }
+                    ctx.stroke(); return;
+                }
+            }
+            
+            drawing = true; 
+            ctx.beginPath(); 
+            ctx.moveTo(p.x, p.y);
+        };
+
+        const moveAction = (e) => {
+            e.preventDefault();
+            if (!drawing) return;
+            if (!isSig && !currentTool.startsWith('line_')) return; 
+            
+            const p = getPos(e); 
+            ctx.strokeStyle = isSig ? '#0000bb' : currentStyle.color; 
+            ctx.lineWidth = isSig ? 2 : currentStyle.width; 
+            ctx.setLineDash(isSig ? [] : currentStyle.dash); 
+            ctx.lineTo(p.x, p.y); 
+            ctx.stroke();
+        };
+
+        const stopAction = (e) => {
+            e.preventDefault();
+            drawing = false;
+        };
+
+        canvas.addEventListener('pointerdown', startAction);
+        canvas.addEventListener('pointermove', moveAction);
+        canvas.addEventListener('pointerup', stopAction);
+        canvas.addEventListener('pointerout', stopAction);
+    }
+    
+    function clearCanvas(id) { const c = document.getElementById(id); if(c) c.getContext('2d').clearRect(0, 0, c.width, c.height); }
+
+    // --- PDF EXPORT (Inklusive Bilder aus dem HTML-DOM) ---
+    async function exportProtokollPDF() {
+        if (typeof window.jspdf === 'undefined') { alert("jsPDF-Bibliothek fehlt."); return; }
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+        const dR = document.getElementById('txtDatumEroeffnung').value.split("-"); const fDat = `${dR[2]}.${dR[1]}.${dR[0]}`;
+
+        // Wir lesen die unsichtbaren img-Tags aus dem Dokument aus, 
+        // die beim Laden der Seite direkt bereitgestellt wurden.
+        const logoElement = document.getElementById('exportLogo');
+        const bgElement = document.getElementById('exportBg');
+
+        const drawBriefkopf = (pNum) => {
+            try {
+                doc.addImage(logoElement, 'PNG', 15, 10, 48, 14);
+            } catch(e) {
+                console.warn("Logo nicht geladen", e);
+            }
+            doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.text("8010 Graz, Münzgrabenstraße 4, Tel. 0316 82 35 70", 15, 27);
+            doc.setFontSize(8.5); doc.text(`Vermessungsamt: ${aktuellerFall.VA}`, 125, 13);
+            doc.text(`Katastralgemeinde: ${aktuellerFall.kg}`, 125, 18);
+            doc.text(`Projekt: ${aktuellerFall.projekt}`, 125, 23);
+            doc.text(`Seite: ${pNum} von 3`, 175, 13); doc.line(15, 30, 195, 30);
+        };
+
+        // --- SEITE 1 ---
+        drawBriefkopf(1);
+        doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.text("Protokoll über die Festlegung des Grenzverlaufs", 15, 38);
+        doc.text("gemäß § 43 Abs. 6 VermG und § 52 Z 5 VermG", 15, 43);
+        doc.setFont("helvetica", "bold"); doc.setFontSize(9.5); doc.text("Verzeichnis der Eigentümer, allfälliger Vertreter und anwesender Personen", 15, 52);
+        doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+        doc.text(doc.splitTextToSize(`Die Verhandlung über den Grenzverlauf wird am ${fDat} um ${document.getElementById('txtUhrzeitEroeffnung').value} Uhr in ${document.getElementById('txtOrtEroeffnung').value} eröffnet. Der Verhandlungsleiter überzeugt sich von der Persönlichkeit der anwesenden Personen und prüft die Vertretungsbefugnis.`, 180), 15, 58);
+        
+        doc.setFont("helvetica", "bold"); doc.text("Gegenstand der Verhandlung", 15, 76);
+        doc.setFont("helvetica", "normal"); doc.text(doc.splitTextToSize("Der Verhandlungsleiter legt den Gegenstand der Grenzverhandlung dar, der die Festlegung der Grenzen der in der Beschreibung des Grenzverlaufs näher bezeichneten Grundstücke betrifft und hält folgende Behelfe vor:", 180), 15, 81);
+
+        doc.rect(15, 92, 180, 45); doc.line(15, 98, 195, 98); doc.line(65, 92, 65, 137); doc.line(120, 92, 120, 137);
+        doc.setFont("helvetica", "bold"); doc.text("Planverfasser", 18, 96); doc.text("Geschäftszahl", 68, 96); doc.text("Anmerkung", 122, 96);
+        doc.setFont("helvetica", "normal");
+        
+        let yPos = 103;
+        aktuellerFall.behelfe.forEach((b, i) => {
+            if(document.getElementById(`chkBehelf_${i}`).checked) {
+                doc.text(b.verfasser, 18, yPos); doc.text(b.gz, 68, yPos); doc.text(b.anm, 122, yPos); yPos += 7;
+            }
+        });
+
+        // --- SEITE 2 ---
+        doc.addPage(); drawBriefkopf(2);
+        doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.text("Beschreibung des Grenzverlaufs", 15, 38);
+        doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+        doc.text(doc.splitTextToSize("Der Verlauf der Grenzen wird von den erschienenen beteiligten Eigentümern oder deren bevollmächtigten Vertretern entsprechend der untenstehenden Skizze festgelegt und im Sinne von §845 ABGB und der Vermessungsverordnung i.d.g.F. gekennzeichnet.\n\nDie Grenze verläuft von Grenzpunkt zu Grenzpunkt geradlinig, sofern nichts anderes angegeben ist. Die zeichnerische Darstellung erfolgt unter Verwendung des im Anhang zur Vermessungsverordnung i.d.g.F. festgelegten Zeichenschlüssels.\n\nWenn der Verlauf von Grenzabschnitten mangels Einigung der Eigentümer nicht festgelegt werden konnte, ist dies untenstehend beschrieben.\n\nAlte Grenzpunkte wurden aufgrund oben genannter GFN (VHW's) überprüft bzw. rückgesetzt und einvernehmlich anerkannt.\n\nDie neuen Grenzpunkte wurden ebenfalls einvernehmlich festgelegt und in der Natur vermarkt.", 180), 15, 45);
+
+        doc.setFont("helvetica", "bold"); doc.text("Skizze", 15, 120); doc.setFont("helvetica", "normal"); doc.text("siehe Beilage", 15, 125);
+        
+        // Fügt zuerst das Hintergrundbild ein (Begehungsplan)
+        try {
+            doc.addImage(bgElement, 'JPEG', 15, 128, 180, 110);
+        } catch(e) {
+            console.warn("Hintergrund konnte nicht gedruckt werden", e);
+        }
+        
+        // Fügt das transparente gezeichnete Overlay darüber
+        try {
+            const sImg = document.getElementById('sketchCanvas').toDataURL('image/png');
+            doc.addImage(sImg, 'PNG', 15, 128, 180, 110);
+        } catch(e) {
+            console.warn("Canvas Fehler", e);
+        }
+        doc.rect(15, 128, 180, 110);
+
+        // --- SEITE 3 ---
+        doc.addPage(); drawBriefkopf(3);
+        doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.text("Zustimmungserklärung", 15, 38);
+        doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+        doc.text(doc.splitTextToSize("Die im nachstehenden Verzeichnis unterfertigten Eigentümer stimmen dem in der Natur einvernehmlich festgelegten und oben beschriebenen Grenzverlauf zu.\nWeiters bestätigen die Eigentümer gem. § 43 Abs. 6 VermG und § 52 Z 5 VermG, dass der Grenzverlauf seit der letzten Vermessung unverändert geblieben ist, bzw. kein anderer Grenzverlauf bekannt ist.", 180), 15, 45);
+
+        let tY = 64;
+        doc.rect(15, tY, 180, 12); doc.line(15, tY+12, 195, tY+12);
+        doc.setFont("helvetica", "bold");
+        doc.text("EZ", 17, tY+8); doc.text("Gst.Nr.", 32, tY+8); doc.text("Name und Anschrift des Eigentümers", 57, tY+8); doc.text("Unterschrift", 122, tY+8); doc.text("Anmerkung", 172, tY+8);
+        doc.line(30, tY, 30, 210); doc.line(55, tY, 55, 210); doc.line(120, tY, 120, 210); doc.line(170, tY, 170, 210);
+        
+        tY += 12; doc.setFont("helvetica", "normal"); doc.setFontSize(8.5);
+        aktuellerFall.eigentuemer.forEach((e, i) => {
+            doc.text(e.ez, 17, tY + 10); doc.text(e.gst, 32, tY + 10);
+            doc.text(e.name, 57, tY + 8); doc.setFontSize(7); doc.text(e.adr, 57, tY + 14); doc.setFontSize(8.5);
+            
+            const sigImg = document.getElementById(`sigCanvas_${i}`).toDataURL('image/png');
+            doc.addImage(sigImg, 'PNG', 122, tY + 2, 45, 14);
+            
+            let customId = document.getElementById(`txtId_${i}`).value;
+            doc.text(customId, 172, tY + 10);
+            
+            doc.line(15, tY + 18, 195, tY + 18);
+            tY += 18;
+        });
+
+        doc.setFontSize(7.5);
+        doc.text("* ID = Identitätsnachweis:     P … persönlich bekannt,     A … allgemein bekannt,     L … amtlicher Lichtbildausweis", 15, 216);
+        doc.text("V.i.A. = Vollmacht im Akt; V.p.P. = Vollmacht per Post erhalten; V.p.E.= Vollmacht per Email erhalten", 15, 221);
+
+        doc.setFontSize(9);
+        doc.text(`Die Verhandlung über den Verlauf der Grenze wird um ${document.getElementById('txtUhrzeitSchliessung').value} Uhr geschlossen.`, 15, 235);
+        let ortFinal = document.getElementById('txtOrtSignatur').value;
+        doc.text(`${ortFinal}, am ${fDat}`, 15, 252);
+        
+        doc.line(130, 252, 185, 252);
+        doc.setFont("helvetica", "bold"); doc.text(nameVerhandlungsleiter, 130, 256);
+        doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.text("Der Verhandlungsleiter", 130, 260);
+
+        doc.save(`Grenzprotokoll_${aktuellerFall.gz.replace("/", "_")}.pdf`);
+    }
+</script>
+</body>
+</html>
