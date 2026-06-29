@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <title>ADP Rinner - Digitales Grenzprotokoll v5.4</title>
+    <title>ADP Rinner - Digitales Grenzprotokoll v6.0</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     
@@ -61,15 +61,21 @@
         .iframe-container iframe { width: 100%; height: 100%; border: none; }
 
         /* SKIZZE INTERFACE */
-        .skizze-wrapper { position: relative; width: 100%; max-width: 900px; height: 550px; border: 2px solid var(--adp-schwarz); background-color: #fff; background-image: url('Begehungsplan.jpg'); background-size: contain; background-repeat: no-repeat; background-position: center; }
+        .skizze-wrapper { position: relative; width: 100%; max-width: 900px; height: 550px; border: 2px solid var(--adp-schwarz); background-color: #fff; background-image: url('Begehungsplan1.jpg'); background-size: contain; background-repeat: no-repeat; background-position: center; }
         #sketchCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
         
-        .toolbar { display: flex; gap: 8px; flex-wrap: wrap; background: #f8fafc; padding: 12px; border: 1px solid #e2e8f0; border-radius: 4px; align-items: center; }
+        .toolbar { display: flex; gap: 8px; flex-wrap: wrap; background: #f8fafc; padding: 12px; border: 1px solid #e2e8f0; border-radius: 4px; align-items: center; font-size: 0.9em; }
+        .toolbar-section { display: flex; align-items: center; gap: 5px; border-right: 2px solid #cbd5e1; padding-right: 10px; margin-right: 5px; }
+        .toolbar-section:last-child { border-right: none; padding-right: 0; margin-right: 0; }
+        .toolbar-label { font-weight: bold; color: var(--adp-grau-dunkel); margin-right: 5px; font-size: 0.85em; text-transform: uppercase; }
+        
         .btn { padding: 8px 12px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 0.9em; }
-        .btn-tool { background-color: var(--adp-grau-dunkel); color: white; border: 1px solid transparent; }
-        .btn-tool.active { background-color: var(--adp-rot); box-shadow: inset 0 0 5px rgba(0,0,0,0.5); }
+        .btn-tool { background-color: var(--adp-grau-hell); color: var(--adp-schwarz); border: 1px solid #cbd5e1; }
+        .btn-tool.active { background-color: var(--adp-rot); color: white; border-color: var(--adp-rot); box-shadow: inset 0 0 5px rgba(0,0,0,0.3); }
         .btn-action { background-color: #666; color: white; }
         .btn-save { background-color: var(--adp-rot); color: white; width: 100%; font-size: 1.2em; padding: 15px; margin-top: 30px; text-transform: uppercase; }
+        
+        .select-vermarkung { padding: 8px; font-weight: bold; border-radius: 4px; border: 1px solid #cbd5e1; }
         
         /* TABELLEN STYLES */
         .sig-table, .behelf-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
@@ -91,7 +97,7 @@
 
 <div style="display: none;">
     <img id="preloadLogo" src="ADP_Logo_2.png" alt="Logo PDF" crossorigin="anonymous">
-    <img id="preloadBgPlan" src="Begehungsplan.jpg" alt="Plan PDF" crossorigin="anonymous">
+    <img id="preloadBgPlan" src="Begehungsplan1.jpg" alt="Plan PDF" crossorigin="anonymous">
 </div>
 
 <div id="loginScreen">
@@ -169,26 +175,44 @@
 
         <div id="tab-seite2" class="tab-content">
             <h4 style="border-bottom: 2px solid var(--adp-schwarz); padding-bottom: 5px;">Beschreibung des Grenzverlaufs</h4>
-            <div class="info-text" style="border-left-color: var(--adp-rot); white-space: pre-line;">Der Verlauf der Grenzen wird von den erschienenen beteiligten Eigentümern oder deren bevollmächtigten Vertretern entsprechend der untenstehenden Skizze festgelegt und im Sinne von §845 ABGB und der Vermessungsverordnung i.d.g.F. gekennzeichnet.
-
-Die Grenze verläuft von Grenzpunkt zu Grenzpunkt geradlinig, sofern nichts anderes angegeben ist. Die zeichnerische Darstellung erfolgt unter Verwendung des im Anhang zur Vermessungsverordnung i.d.g.F. festgelegten Zeichenschlüssels.
-
-Wenn der Verlauf von Grenzabschnitten mangels Einigung der Eigentümer nicht festgelegt werden konnte, ist dies untenstehend beschrieben.
-
-Alte Grenzpunkte wurden aufgrund oben genannter GFN (VHW's) überprüft bzw. rückgesetzt und einvernehmlich anerkannt.
-Die neuen Grenzpunkte wurden ebenfalls einvernehmlich festgelegt und in der Natur vermarkt.</div>
-
-            <p style="font-size: 1.1em; margin-top: 25px;"><strong>Skizze <span style="color: var(--adp-rot);">(siehe Beilage)</span>:</strong></p>
+            
             <div class="toolbar">
-                <button class="btn btn-tool active" id="tool-line_solid" onclick="setTool('line_solid', '#000000', 2, [])">Unstrittig</button>
-                <button class="btn btn-tool" id="tool-line_new" onclick="setTool('line_new', '#9b1b22', 3, [])">Neu (Rot)</button>
-                <button class="btn btn-tool" id="tool-line_dash" onclick="setTool('line_dash', '#9b1b22', 2, [6, 6])">Strittig</button>
-                <button class="btn btn-tool" id="tool-sym_marke" onclick="setTool('sym_marke', '#000', 2, [])">⨁ Rohr</button>
-                <button class="btn btn-tool" id="tool-sym_kreis" onclick="setTool('sym_kreis', '#000', 2, [])">◯ Zaunsäule</button>
-                <button class="btn btn-tool" id="tool-sym_stein" onclick="setTool('sym_stein', '#000', 2, [])">⚫ Stein</button>
-                <button class="btn btn-tool" id="tool-text" onclick="setTool('text', '#9b1b22', 1, [])">A Text</button>
+                <div class="toolbar-section">
+                    <span class="toolbar-label">✏️ Stift:</span>
+                    <button class="btn btn-tool active" id="tool-draw_black" onclick="setDrawingTool('draw_black', '#000000')">Schwarz</button>
+                    <button class="btn btn-tool" id="tool-draw_red" onclick="setDrawingTool('draw_red', '#9b1b22')">Rot</button>
+                    <button class="btn btn-tool" id="tool-draw_blue" onclick="setDrawingTool('draw_blue', '#0000ff')">Blau</button>
+                    <button class="btn btn-tool" id="tool-draw_green" onclick="setDrawingTool('draw_green', '#008000')">Grün</button>
+                </div>
+                
+                <div class="toolbar-section">
+                    <span class="toolbar-label">📍 Vermarkung:</span>
+                    <select id="selectStatusVermarkung" class="select-vermarkung" onchange="updateVermarkungTool()">
+                        <option value="neu" style="color: #9b1b22;">Neu (Rot)</option>
+                        <option value="alt" style="color: #000000;">Alt (Schwarz)</option>
+                    </select>
+                    <select id="selectTypVermarkung" class="select-vermarkung" onchange="updateVermarkungTool()">
+                        <option value="HE">HE (Hausecke)</option>
+                        <option value="ME">ME (Mauerecke)</option>
+                        <option value="ZS">ZS (Zaunsäule)</option>
+                        <option value="MM">MM (Marke Metall)</option>
+                        <option value="MK">MK (Marke Kunststoff)</option>
+                        <option value="ER">ER (Rohr Eisen)</option>
+                        <option value="NG">NG (Nagel)</option>
+                        <option value="GS_behauen">GS (Grenzstein behauen)</option>
+                        <option value="GS_unbehauen">GS (Grenzstein unbehauen)</option>
+                    </select>
+                    <button class="btn btn-tool" id="tool-vermarkung_sym" onclick="activateVermarkungTool()">Symbol setzen</button>
+                </div>
+
+                <div class="toolbar-section">
+                    <span class="toolbar-label">💬 Text:</span>
+                    <button class="btn btn-tool" id="tool-text" onclick="setTool('text', '#9b1b22', 1, [])">A Text</button>
+                </div>
+                
                 <button class="btn btn-action" onclick="clearCanvas('sketchCanvas')">Leeren</button>
             </div>
+
             <div class="toolbar" style="background: #eff6ff; border-color: #bfdbfe; margin-bottom: 15px;">
                 <strong>🔌 CAD-Schnittstelle:</strong>
                 <button class="btn" style="background:#3b82f6; color:white;" onclick="simulateExternalAppOpen()">In QField zeichnen</button>
@@ -210,16 +234,16 @@ Die neuen Grenzpunkte wurden ebenfalls einvernehmlich festgelegt und in der Natu
                         <th style="width: 12%;">Gst.Nr.</th>
                         <th style="width: 34%;">Name und Anschrift des Eigentümers</th>
                         <th style="width: 32%;">Unterschrift</th>
-                        <th style="width: 14%;">Anmerkung</th>
+                        <th style="width: 14%;">Anmerkung / Identität</th>
                     </tr>
                 </thead>
                 <tbody id="eigentuemerTableBody"></tbody>
             </table>
             
             <div style="margin-top:30px; background:white; padding:20px; border:2px solid var(--adp-schwarz); line-height: 1.8;">
-                Die Verhandlung über den Verlauf der Grenze wird um <input type="text" id="txtUhrzeitSchliessung" class="inline-input" style="width: 80px;" placeholder="Uhrzeit..."> Uhr geschlossen. 
+                Die Verhandlung über den Verlauf der Grenze wird um <input type="time" id="txtUhrzeitSchliessung" class="inline-input" style="width: 110px; font-weight: bold;"> Uhr geschlossen. 
                 <input type="text" id="txtOrtSignatur" class="inline-input" style="font-weight:bold; width: 180px;" placeholder="Ort...">, am 
-                <input type="text" id="txtDatumSignatur" class="inline-input" style="font-weight:bold; width: 130px;" placeholder="Datum...">
+                <input type="date" id="txtDatumSignatur" class="inline-input" style="font-weight:bold; width: 150px;">
                 <p style="text-align:right; margin-top: 20px; margin-bottom: 5px;"><strong>DI Gerald Fuxjäger</strong><br><small>Verhandlungsleiter</small></p>
             </div>
             <button class="btn btn-save" onclick="exportProtokollPDF()">Protokoll-PDF generieren</button>
@@ -230,9 +254,9 @@ Die neuen Grenzpunkte wurden ebenfalls einvernehmlich festgelegt und in der Natu
 <div id="gfnModal" class="modal">
     <div class="modal-content">
         <span class="modal-close" onclick="closeGfnViewer()">&times;</span>
-        <h4 style="margin: 0 0 10px 0; color: var(--adp-rot);" id="modalTitle">Historischer Behelfs-Viewer</h4>
+        <h4 style="margin: 0 0 10px 0; color: var(--adp-rot);" id="modalTitle">Digitaler Behelfs-Viewer</h4>
         <div class="pdf-embed-container">
-            <iframe src="GFN_1958.pdf" id="gfnIframe"></iframe>
+            <iframe src="about:blank" id="gfnIframe"></iframe>
         </div>
     </div>
 </div>
@@ -240,8 +264,8 @@ Die neuen Grenzpunkte wurden ebenfalls einvernehmlich festgelegt und in der Natu
 <script>
     const nameVerhandlungsleiter = "DI Gerald Fuxjäger";
     let externalImageLoaded = false;
+    let signatureTracks = [];
 
-    // SICHERE BILDEXTRAKTION FÜR DEN PDF EXPORT
     function getSafeImageData(imgId, format) {
         try {
             const img = document.getElementById(imgId);
@@ -252,14 +276,16 @@ Die neuen Grenzpunkte wurden ebenfalls einvernehmlich festgelegt und in der Natu
             canvas.getContext('2d').drawImage(img, 0, 0);
             return canvas.toDataURL(format);
         } catch (e) {
-            console.warn("Sicherheits-Blockade (CORS) beim Laden von " + imgId + ". Lade die Datei auf GitHub hoch, um dies zu beheben.", e);
+            console.warn("CORS/Preload Blockade", e);
             return null;
         }
     }
 
     const datenbank = [{ 
         gz: "19389_Gruber_Kapellenweg", VA: "Graz", kg: "63243 Kirchenviertel", projekt: "19389", 
-        behelfe: [{ verfasser: "Dipl. Ing. Karl Rinner", gz: "GFN 27/1958", anm: "Teilungsplan" }], 
+        behelfe: [
+            { verfasser: "Dipl. Ing. Karl Rinner", gz: "GFN 27/1958", anm: "Teilungsplan" }
+        ], 
         eigentuemer: [
             { ez: "744", gst: ".626", name: "Maria Gruber", adr: "Kapellenweg 2, 8101 Gratkorn" },
             { ez: "744", gst: ".626", name: "Lukas Gruber", adr: "Kapellenweg 2, 8101 Gratkorn" },
@@ -286,12 +312,12 @@ Die neuen Grenzpunkte wurden ebenfalls einvernehmlich festgelegt und in der Natu
     function startVerhandlung() {
         const now = new Date();
         document.getElementById('txtDatumEroeffnung').value = now.toISOString().split('T')[0];
+        document.getElementById('txtDatumSignatur').value = now.toISOString().split('T')[0];
         document.getElementById('txtUhrzeitEroeffnung').value = now.toTimeString().split(' ')[0].substring(0, 5);
         
         document.getElementById('txtUhrzeitSchliessung').value = "";
-        document.getElementById('txtOrtEroeffnung').value = "";
-        document.getElementById('txtOrtSignatur').value = "";
-        document.getElementById('txtDatumSignatur').value = "";
+        document.getElementById('txtOrtEroeffnung').value = "Gratkorn";
+        document.getElementById('txtOrtSignatur').value = "Gratkorn";
 
         document.getElementById('startScreen').style.display = 'none';
         document.getElementById('appScreen').style.display = 'block';
@@ -303,9 +329,10 @@ Die neuen Grenzpunkte wurden ebenfalls einvernehmlich festgelegt und in der Natu
 
         const eBody = document.getElementById('eigentuemerTableBody'); eBody.innerHTML = "";
         activeCanvasIds = [];
+        signatureTracks = [];
         aktuellerFall.eigentuemer.forEach((e, i) => {
             const cId = `sigCanvas_${i}`; activeCanvasIds.push(cId);
-            eBody.innerHTML += `<tr><td><strong>${e.ez}</strong></td><td><strong>${e.gst}</strong></td><td>${e.name}<br><small>${e.adr}</small></td><td class="sig-box-container"><canvas id="${cId}" width="280" height="55" class="sig-canvas"></canvas></td><td><input type="text" id="txtId_${i}" value="" style="width:90%; padding:5px; text-align:center;"></td></tr>`;
+            eBody.innerHTML += `<tr><td><strong>${e.ez}</strong></td><td><strong>${e.gst}</strong></td><td>${e.name}<br><small>${e.adr}</small></td><td class="sig-box-container"><canvas id="${cId}" width="280" height="55" class="sig-canvas"></canvas></td><td><input type="text" id="txtId_${i}" placeholder="z.B. Reisepass..." style="width:90%; padding:5px; text-align:center;"></td></tr>`;
         });
 
         setTimeout(() => { activeCanvasIds.forEach(id => setupCanvas(id, true)); setupCanvas('sketchCanvas', false); }, 150);
@@ -344,10 +371,36 @@ Die neuen Grenzpunkte wurden ebenfalls einvernehmlich festgelegt und in der Natu
         reader.readAsDataURL(file);
     }
 
-    let currentTool = 'line_solid'; let currentStyle = { color: '#000000', width: 2, dash: [] };
-    function setTool(t, c, w, d) { currentTool = t; currentStyle = { color: c, width: w, dash: d }; document.querySelectorAll('.btn-tool').forEach(b => b.classList.remove('active')); document.getElementById('tool-'+t).classList.add('active'); }
+    let currentTool = 'draw_black'; 
+    let currentStyle = { color: '#000000', width: 2, dash: [] };
 
-    function setupCanvas(canvasId, isSig) {
+    function setTool(t, c, w, d) { 
+        currentTool = t; 
+        currentStyle = { color: c, width: w, dash: d }; 
+        document.querySelectorAll('.btn-tool').forEach(b => b.classList.remove('active')); 
+        if(document.getElementById('tool-'+t)) {
+            document.getElementById('tool-'+t).classList.add('active'); 
+        }
+    }
+
+    function setDrawingTool(toolId, hexColor) {
+        setTool(toolId, hexColor, 2, []);
+    }
+
+    function updateVermarkungTool() {
+        if (currentTool.startsWith('vermarkung_')) {
+            activateVermarkungTool();
+        }
+    }
+
+    function activateVermarkungTool() {
+        const status = document.getElementById('selectStatusVermarkung').value;
+        const color = (status === 'neu') ? '#9b1b22' : '#000000'; 
+        const typ = document.getElementById('selectTypVermarkung').value;
+        setTool('vermarkung_' + typ, color, 2, []);
+    }
+
+  function setupCanvas(canvasId, isSig) {
         const canvas = document.getElementById(canvasId); if (!canvas) return;
         const ctx = canvas.getContext('2d'); let drawing = false;
         const getPos = (e) => { const rect = canvas.getBoundingClientRect(); return { x: (e.clientX - rect.left) * (canvas.width / rect.width), y: (e.clientY - rect.top) * (canvas.height / rect.height) }; };
@@ -356,50 +409,89 @@ Die neuen Grenzpunkte wurden ebenfalls einvernehmlich festgelegt und in der Natu
             e.preventDefault(); const p = getPos(e);
             if (!isSig) {
                 if (currentTool === 'text') {
-                    const txt = prompt("Text / Nummer:");
-                    if(txt) { ctx.font = "bold 16px Arial"; ctx.fillStyle = currentStyle.color; ctx.fillText(txt, p.x, p.y + 6); }
+                    const txt = prompt("Freitext eingeben:");
+                    if(txt) { ctx.font = "bold 15px Arial"; ctx.fillStyle = currentStyle.color; ctx.fillText(txt, p.x, p.y + 5); }
                     return;
                 }
-                if (currentTool.startsWith('sym_')) {
-                    ctx.strokeStyle = currentStyle.color; ctx.lineWidth = 2; ctx.beginPath();
-                    if (currentTool === 'sym_marke') { ctx.arc(p.x, p.y, 6, 0, 2*Math.PI); ctx.moveTo(p.x-8, p.y); ctx.lineTo(p.x+8, p.y); ctx.moveTo(p.x, p.y-8); ctx.lineTo(p.x, p.y+8); }
-                    else if (currentTool === 'sym_kreis') { ctx.arc(p.x, p.y, 6, 0, 2*Math.PI); }
-                    else if (currentTool === 'sym_stein') { ctx.arc(p.x, p.y, 6, 0, 2*Math.PI); ctx.fillStyle = currentStyle.color; ctx.fill(); }
-                    ctx.stroke(); return;
+                
+                if (currentTool.startsWith('vermarkung_')) {
+                    let abkuerzung = currentTool.split('_')[1];
+                    ctx.fillStyle = currentStyle.color; 
+                    ctx.strokeStyle = currentStyle.color;
+                    ctx.lineWidth = 2;
+                    
+                    ctx.textAlign = "left";
+                    ctx.textBaseline = "middle";
+                    
+                    // FALL 1: Reiner Kreis für HE, ME, ZS
+                    if (['HE', 'ME', 'ZS'].includes(abkuerzung)) {
+                        ctx.beginPath();
+                        ctx.arc(p.x, p.y, 6, 0, 2 * Math.PI);
+                        ctx.stroke();
+                    }
+                    // FALL 2: Kreis mit X für MM, MK, ER, NG
+                    else if (['MM', 'MK', 'ER', 'NG'].includes(abkuerzung)) {
+                        ctx.beginPath();
+                        ctx.arc(p.x, p.y, 6, 0, 2 * Math.PI);
+                        ctx.moveTo(p.x - 4, p.y - 4); ctx.lineTo(p.x + 4, p.y + 4);
+                        ctx.moveTo(p.x + 4, p.y - 4); ctx.lineTo(p.x - 4, p.y + 4);
+                        ctx.stroke();
+                    }
+                    // FALL 3 & 4: Ausgefüllter Kreis für alle Grenzsteine (GS)
+                    else if (abkuerzung.startsWith('GS')) {
+                        ctx.beginPath();
+                        ctx.arc(p.x, p.y, 6, 0, 2 * Math.PI);
+                        ctx.fill();
+                        abkuerzung = "GS"; // Kürzel im Plan bleibt einheitlich GS
+                    }
+                    
+                    // Kürzel mit sicherem Abstand rechts daneben platzieren
+                    ctx.font = "bold 13px Arial";
+                    ctx.fillText(abkuerzung, p.x + 12, p.y);
+                    return;
                 }
             }
             drawing = true; ctx.beginPath(); ctx.moveTo(p.x, p.y);
+            if(isSig && !signatureTracks.includes(canvasId)) { signatureTracks.push(canvasId); }
         });
         canvas.addEventListener('pointermove', (e) => {
-            e.preventDefault(); if (!drawing || (!isSig && !currentTool.startsWith('line_'))) return;
-            const p = getPos(e); ctx.strokeStyle = isSig ? '#0000bb' : currentStyle.color; ctx.lineWidth = isSig ? 2 : currentStyle.width; ctx.setLineDash(isSig ? [] : currentStyle.dash); ctx.lineTo(p.x, p.y); ctx.stroke();
+            e.preventDefault(); if (!drawing || (!isSig && !currentTool.startsWith('draw_'))) return;
+            const p = getPos(e); ctx.strokeStyle = isSig ? '#0000bb' : currentStyle.color; ctx.lineWidth = isSig ? 2 : currentStyle.width; ctx.lineTo(p.x, p.y); ctx.stroke();
         });
         canvas.addEventListener('pointerup', (e) => { e.preventDefault(); drawing = false; });
     }
     
     function clearCanvas(id) { 
         const c = document.getElementById(id); if(c) c.getContext('2d').clearRect(0, 0, c.width, c.height); 
-        if(id === 'sketchCanvas') { externalImageLoaded = false; document.querySelector('.skizze-wrapper').style.backgroundImage = "url('Begehungsplan.jpg')"; }
+        if(id === 'sketchCanvas') { externalImageLoaded = false; document.querySelector('.skizze-wrapper').style.backgroundImage = "url('Begehungsplan1.jpg')"; }
+        if(signatureTracks.includes(id)) { signatureTracks = signatureTracks.filter(item => item !== id); }
     }
 
     async function exportProtokollPDF() {
+        const uhrzeitSchliessung = document.getElementById('txtUhrzeitSchliessung').value;
+        if(!uhrzeitSchliessung) {
+            alert("⚠️ Validierungsfehler: Die Uhrzeit der Schließung des Protokolls muss zwingend eingetragen werden!");
+            openTab('tab-seite3');
+            return;
+        }
+
+        if(signatureTracks.length < aktuellerFall.eigentuemer.length) {
+            const fortfahren = confirm(`⚠️ Achtung: Es liegen nur ${signatureTracks.length} von ${aktuellerFall.eigentuemer.length} Unterschriften vor. Möchten Sie das unvollständige Protokoll trotzdem exportieren?`);
+            if(!fortfahren) return;
+        }
+
         const { jsPDF } = window.jspdf; const doc = new jsPDF();
         
-        // Werte aus der App auslesen
         const dR = document.getElementById('txtDatumEroeffnung').value.split("-"); const fDat = dR.length === 3 ? `${dR[2]}.${dR[1]}.${dR[0]}` : "___";
+        const dS = document.getElementById('txtDatumSignatur').value.split("-"); const fDatSig = dS.length === 3 ? `${dS[2]}.${dS[1]}.${dS[0]}` : "___";
         const ortEroeffnung = document.getElementById('txtOrtEroeffnung').value || "___________";
         const uhrzeitEroeffnung = document.getElementById('txtUhrzeitEroeffnung').value || "______";
-        const uhrzeitSchliessung = document.getElementById('txtUhrzeitSchliessung').value || "______";
         const ortSignatur = document.getElementById('txtOrtSignatur').value || "___________";
-        const datumSignatur = document.getElementById('txtDatumSignatur').value || "___________";
         
-        // Sichere Bildextraktion durchführen
         const logoData = getSafeImageData('preloadLogo', 'image/png');
         const planData = getSafeImageData('preloadBgPlan', 'image/jpeg');
         
-        // SEITEN-HEADER
         const drawBriefkopf = (pNum) => {
-            // Wenn Logo über GitHub geladen wurde, zeichnen
             if (logoData) { doc.addImage(logoData, 'PNG', 135, 10, 48, 14); }
             doc.setFontSize(8.5); doc.setFont("helvetica", "bold"); 
             doc.text("Vermessungsamt: Graz", 15, 14);
@@ -437,7 +529,7 @@ Die neuen Grenzpunkte wurden ebenfalls einvernehmlich festgelegt und in der Natu
         doc.setFont("helvetica", "bold"); doc.text("Beschreibung des Grenzverlaufs", 15, 38);
         doc.setFont("helvetica", "normal"); doc.setFontSize(8.5);
         
-        let seite2TextBlock = "Der Verlauf der Grenzen wird von den erschienenen beteiligten Eigentümern oder deren bevollmächtigten Vertretern entsprechend der untenstehenden Skizze festgelegt und im Sinne von §845 ABGB und der Vermessungsverordnung i.d.g.F. gekennzeichnet.\n\nDie Grenze verläuft von Grenzpunkt zu Grenzpunkt geradlinig, sofern nichts anderes angegeben ist. Die zeichnerische Darstellung erfolgt unter Verwendung des im Anhang zur Vermessungsverordnung i.d.g.F. festgelegten Zeichenschlüssels.\n\nWenn der Verlauf von Grenzabschnitten mangels Einigung der Eigentümer nicht festgelegt werden konnte, ist dies untenstehend beschrieben.\n\nAlte Grenzpunkte wurden aufgrund oben genannter GFN (VHW's) überprüft bzw. rückgesetzt und einvernehmlich anerkannt.\n\nDie neuen Grenzpunkte wurden ebenfalls einvernehmlich festgelegt und in der Natur vermarkt.";
+        let seite2TextBlock = "Der Verlauf der Grenzen wird von den erschienenen beteiligten Eigentümern oder deren bevollmächtigten Vertretern entsprechend der untenstehenden Skizze festgelegt und im Sinne von §845 ABGB und der Vermessungsverordnung i.d.g.F. gekennzeichnet.\n\nDie Grenze verläuft von Grenzpunkt zu Grenzpunkt geradlinig, sofern nichts anderes angegeben ist. Die zeichnerische Darstellung erfolgt unter Verwendung des im Anhang zur Vermessungsverordnung i.d.g.F. festgelegten Zeichenschlüssels.\n\nAlte Grenzpunkte wurden aufgrund oben genannter GFN (VHW's) überprüft bzw. rückgesetzt und einvernehmlich anerkannt.\n\nDie neuen Grenzpunkte wurden ebenfalls einvernehmlich festgelegt und in der Natur vermarkt.";
         doc.text(doc.splitTextToSize(seite2TextBlock, 180), 15, 45);
 
         if (!externalImageLoaded) { 
@@ -477,7 +569,7 @@ Die neuen Grenzpunkte wurden ebenfalls einvernehmlich festgelegt und in der Natu
         });
         
         doc.setFont("helvetica", "normal"); doc.setFontSize(9);
-        let schlusssatz = `Die Verhandlung über den Verlauf der Grenze wird um ${uhrzeitSchliessung} Uhr geschlossen. ${ortSignatur}, am ${datumSignatur}.`;
+        let schlusssatz = `Die Verhandlung über den Verlauf der Grenze wird um ${uhrzeitSchliessung} Uhr geschlossen. ${ortSignatur}, am ${fDatSig}.`;
         doc.text(doc.splitTextToSize(schlusssatz, 180), 15, tY + 8);
         
         doc.line(130, tY + 18, 185, tY + 18); 
