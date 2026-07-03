@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <title>ADP Rinner - Digitales Grenzprotokoll v6.0</title>
+    <title>ADP Rinner - Digitales Grenzprotokoll v6.2</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     
@@ -61,7 +61,7 @@
         .iframe-container iframe { width: 100%; height: 100%; border: none; }
 
         /* SKIZZE INTERFACE */
-        .skizze-wrapper { position: relative; width: 100%; max-width: 900px; height: 550px; border: 2px solid var(--adp-schwarz); background-color: #fff; background-image: url('Begehungsplan1.jpg'); background-size: contain; background-repeat: no-repeat; background-position: center; }
+        .skizze-wrapper { position: relative; width: 100%; max-width: 900px; height: 550px; border: 2px solid var(--adp-schwarz); background-color: #fff; background-image: url('Begehungsplan.jpg'); background-size: contain; background-repeat: no-repeat; background-position: center; }
         #sketchCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
         
         .toolbar { display: flex; gap: 8px; flex-wrap: wrap; background: #f8fafc; padding: 12px; border: 1px solid #e2e8f0; border-radius: 4px; align-items: center; font-size: 0.9em; }
@@ -97,7 +97,7 @@
 
 <div style="display: none;">
     <img id="preloadLogo" src="ADP_Logo_2.png" alt="Logo PDF" crossorigin="anonymous">
-    <img id="preloadBgPlan" src="Begehungsplan1.jpg" alt="Plan PDF" crossorigin="anonymous">
+    <img id="preloadBgPlan" src="Begehungsplan.jpg" alt="Plan PDF" crossorigin="anonymous">
 </div>
 
 <div id="loginScreen">
@@ -150,7 +150,7 @@
             
             <h4>Verzeichnis der Eigentümer, allfälliger Vertreter und anwesender Personen</h4>
             <div class="info-text">
-                Die Verhandlung wird am <input type="date" id="txtDatumEroeffnung" class="inline-input" style="font-weight:bold;"> um <input type="time" id="txtUhrzeitEroeffnung" class="inline-input" style="font-weight:bold;"> Uhr in <input type="text" id="txtOrtEroeffnung" class="inline-input" style="font-weight:bold; width: 220px;" placeholder="Ort eintragen..."> von <strong>DI Gerald Fuxjäger</strong> eröffnet.
+                Die Verhandlung wird am <input type="date" id="txtDatumEroeffnung" class="inline-input" style="font-weight:bold;"> um <input type="time" id="txtUhrzeitEroeffnung" class="inline-input" style="font-weight:bold;"> Uhr in <input type="text" id="txtOrtEroeffnung" class="inline-input" style="font-weight:bold; width: 220px;" placeholder="Ort eintragen..."> von <strong>DI Gerald Fuxjäger</strong> eröffnet. Der Verhandlungsleiter überzeugt sich von der Persönlichkeit der anwesenden Personen und überprüft die Vertretungsbefugnis.
             </div>
             
             <h4>Gegenstand der Verhandlung</h4>
@@ -177,6 +177,7 @@
             <h4 style="border-bottom: 2px solid var(--adp-schwarz); padding-bottom: 5px;">Beschreibung des Grenzverlaufs</h4>
             
             <div class="toolbar">
+                <!-- Sektion 1: Freihand-Stifte -->
                 <div class="toolbar-section">
                     <span class="toolbar-label">✏️ Stift:</span>
                     <button class="btn btn-tool active" id="tool-draw_black" onclick="setDrawingTool('draw_black', '#000000')">Schwarz</button>
@@ -185,6 +186,7 @@
                     <button class="btn btn-tool" id="tool-draw_green" onclick="setDrawingTool('draw_green', '#008000')">Grün</button>
                 </div>
                 
+                <!-- Sektion 2: Geometrische Vermarkungssymbole -->
                 <div class="toolbar-section">
                     <span class="toolbar-label">📍 Vermarkung:</span>
                     <select id="selectStatusVermarkung" class="select-vermarkung" onchange="updateVermarkungTool()">
@@ -205,6 +207,7 @@
                     <button class="btn btn-tool" id="tool-vermarkung_sym" onclick="activateVermarkungTool()">Symbol setzen</button>
                 </div>
 
+                <!-- Sektion 3: Freitexteingabe & Löschen -->
                 <div class="toolbar-section">
                     <span class="toolbar-label">💬 Text:</span>
                     <button class="btn btn-tool" id="tool-text" onclick="setTool('text', '#9b1b22', 1, [])">A Text</button>
@@ -254,7 +257,7 @@
 <div id="gfnModal" class="modal">
     <div class="modal-content">
         <span class="modal-close" onclick="closeGfnViewer()">&times;</span>
-        <h4 style="margin: 0 0 10px 0; color: var(--adp-rot);" id="modalTitle">Digitaler Behelfs-Viewer</h4>
+        <h4 style="margin: 0 0 10px 0; color: var(--adp-rot); font-size: 1.3em;" id="modalTitle">GFN 27/1958</h4>
         <div class="pdf-embed-container">
             <iframe src="about:blank" id="gfnIframe"></iframe>
         </div>
@@ -284,7 +287,7 @@
     const datenbank = [{ 
         gz: "19389_Gruber_Kapellenweg", VA: "Graz", kg: "63243 Kirchenviertel", projekt: "19389", 
         behelfe: [
-            { verfasser: "Dipl. Ing. Karl Rinner", gz: "GFN 27/1958", anm: "Teilungsplan" }
+            { verfasser: "Dipl. Ing. Karl Rinner", gz: "GFN 27/1958", anm: "Teilungsplan", pdf: "GFN_1958.pdf" }
         ], 
         eigentuemer: [
             { ez: "744", gst: ".626", name: "Maria Gruber", adr: "Kapellenweg 2, 8101 Gratkorn" },
@@ -324,7 +327,7 @@
 
         const bBody = document.getElementById('behelfeTableBody'); bBody.innerHTML = "";
         aktuellerFall.behelfe.forEach((b, i) => {
-            bBody.innerHTML += `<tr><td style='text-align:center;'><input type="checkbox" id="chkBehelf_${i}" checked></td><td>${b.verfasser}</td><td>${b.gz}</td><td>${b.anm}</td><td style="text-align:center;"><button class="btn" style="background:#10b981; color:white; padding:4px 10px;" onclick="openGfnViewer('${b.gz}')">👁️ Öffnen</button></td></tr>`;
+            bBody.innerHTML += `<tr><td style='text-align:center;'><input type="checkbox" id="chkBehelf_${i}" checked></td><td>${b.verfasser}</td><td>${b.gz}</td><td>${b.anm}</td><td style="text-align:center;"><button class="btn" style="background:#10b981; color:white; padding:4px 10px;" onclick="openGfnViewer('${b.gz}', '${b.pdf}')">👁️ Öffnen</button></td></tr>`;
         });
 
         const eBody = document.getElementById('eigentuemerTableBody'); eBody.innerHTML = "";
@@ -338,12 +341,16 @@
         setTimeout(() => { activeCanvasIds.forEach(id => setupCanvas(id, true)); setupCanvas('sketchCanvas', false); }, 150);
     }
 
-    function openGfnViewer(title) {
-        document.getElementById('modalTitle').innerText = "Verhandlungshilfe: " + title;
+    function openGfnViewer(title, pdfFile) {
+        document.getElementById('modalTitle').innerText = title;
+        document.getElementById('gfnIframe').src = pdfFile; 
         document.getElementById('gfnModal').style.display = 'flex';
     }
     document.getElementById('gfnModal').addEventListener('click', function(e) { if(e.target === this) closeGfnViewer(); });
-    function closeGfnViewer() { document.getElementById('gfnModal').style.display = 'none'; }
+    function closeGfnViewer() { 
+        document.getElementById('gfnModal').style.display = 'none'; 
+        document.getElementById('gfnIframe').src = "about:blank"; 
+    }
 
     function openTab(id) {
         document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
@@ -400,7 +407,7 @@
         setTool('vermarkung_' + typ, color, 2, []);
     }
 
-  function setupCanvas(canvasId, isSig) {
+    function setupCanvas(canvasId, isSig) {
         const canvas = document.getElementById(canvasId); if (!canvas) return;
         const ctx = canvas.getContext('2d'); let drawing = false;
         const getPos = (e) => { const rect = canvas.getBoundingClientRect(); return { x: (e.clientX - rect.left) * (canvas.width / rect.width), y: (e.clientY - rect.top) * (canvas.height / rect.height) }; };
@@ -423,29 +430,22 @@
                     ctx.textAlign = "left";
                     ctx.textBaseline = "middle";
                     
-                    // FALL 1: Reiner Kreis für HE, ME, ZS
-                    if (['HE', 'ME', 'ZS'].includes(abkuerzung)) {
-                        ctx.beginPath();
-                        ctx.arc(p.x, p.y, 6, 0, 2 * Math.PI);
-                        ctx.stroke();
-                    }
-                    // FALL 2: Kreis mit X für MM, MK, ER, NG
-                    else if (['MM', 'MK', 'ER', 'NG'].includes(abkuerzung)) {
-                        ctx.beginPath();
-                        ctx.arc(p.x, p.y, 6, 0, 2 * Math.PI);
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 6, 0, 2 * Math.PI);
+                    
+                    if (['MM', 'MK', 'ER', 'NG'].includes(abkuerzung)) {
                         ctx.moveTo(p.x - 4, p.y - 4); ctx.lineTo(p.x + 4, p.y + 4);
                         ctx.moveTo(p.x + 4, p.y - 4); ctx.lineTo(p.x - 4, p.y + 4);
-                        ctx.stroke();
                     }
-                    // FALL 3 & 4: Ausgefüllter Kreis für alle Grenzsteine (GS)
-                    else if (abkuerzung.startsWith('GS')) {
-                        ctx.beginPath();
-                        ctx.arc(p.x, p.y, 6, 0, 2 * Math.PI);
-                        ctx.fill();
-                        abkuerzung = "GS"; // Kürzel im Plan bleibt einheitlich GS
+                    else if (abkuerzung === 'behauen') {
+                        abkuerzung = "GS beh.";
+                    }
+                    else if (abkuerzung === 'unbehauen') {
+                        abkuerzung = "GS unb.";
                     }
                     
-                    // Kürzel mit sicherem Abstand rechts daneben platzieren
+                    ctx.stroke();
+                    
                     ctx.font = "bold 13px Arial";
                     ctx.fillText(abkuerzung, p.x + 12, p.y);
                     return;
@@ -463,7 +463,7 @@
     
     function clearCanvas(id) { 
         const c = document.getElementById(id); if(c) c.getContext('2d').clearRect(0, 0, c.width, c.height); 
-        if(id === 'sketchCanvas') { externalImageLoaded = false; document.querySelector('.skizze-wrapper').style.backgroundImage = "url('Begehungsplan1.jpg')"; }
+        if(id === 'sketchCanvas') { externalImageLoaded = false; document.querySelector('.skizze-wrapper').style.backgroundImage = "url('Begehungsplan.jpg')"; }
         if(signatureTracks.includes(id)) { signatureTracks = signatureTracks.filter(item => item !== id); }
     }
 
@@ -506,20 +506,21 @@
         doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.text("Protokoll über die Festlegung des Grenzverlaufs", 15, 38);
         doc.setFont("helvetica", "normal"); doc.setFontSize(9);
         
-        let seite1Eroeffnungstext = `Die Verhandlung wird am ${fDat} um ${uhrzeitEroeffnung} Uhr in ${ortEroeffnung} von ${nameVerhandlungsleiter} eröffnet.`;
+        // INTEGRATION DES NEUEN ERÖFFNUNGSTEXTES IM PDF-EXPORT
+        let seite1Eroeffnungstext = `Die Verhandlung wird am ${fDat} um ${uhrzeitEroeffnung} Uhr in ${ortEroeffnung} von ${nameVerhandlungsleiter} eröffnet. Der Verhandlungsleiter überzeugt sich von der Persönlichkeit der anwesenden Personen und überprüft die Vertretungsbefugnis.`;
         doc.text(doc.splitTextToSize(seite1Eroeffnungstext, 180), 15, 46);
         
-        doc.setFont("helvetica", "bold"); doc.text("Verzeichnis der Eigentümer, allfälliger Vertreter und anwesender Personen", 15, 58);
-        doc.setFont("helvetica", "bold"); doc.text("Gegenstand der Verhandlung", 15, 68);
+        doc.setFont("helvetica", "bold"); doc.text("Verzeichnis der Eigentümer, allfälliger Vertreter und anwesender Personen", 15, 62);
+        doc.setFont("helvetica", "bold"); doc.text("Gegenstand der Verhandlung", 15, 72);
         doc.setFont("helvetica", "normal");
         
         let seite1Gegenstandstext = "Der Verhandlungsleiter legt den Gegenstand der Grenzverhandlung dar, der die Festlegung der Grenzen der in der Beschreibung des Grenzverlaufs näher bezeichneten Grundstücke betrifft und hält folgende Behelfe vor:";
-        doc.text(doc.splitTextToSize(seite1Gegenstandstext, 180), 15, 73);
+        doc.text(doc.splitTextToSize(seite1Gegenstandstext, 180), 15, 77);
 
-        doc.rect(15, 86, 180, 36); doc.line(15, 94, 195, 94); doc.line(65, 86, 65, 122); doc.line(120, 86, 120, 122);  
-        doc.setFont("helvetica", "bold"); doc.text("Planverfasser", 18, 91); doc.text("Geschäftszahl", 68, 91); doc.text("Anmerkung", 122, 91);
+        doc.rect(15, 88, 180, 36); doc.line(15, 96, 195, 96); doc.line(65, 88, 65, 124); doc.line(120, 88, 120, 124);  
+        doc.setFont("helvetica", "bold"); doc.text("Planverfasser", 18, 93); doc.text("Geschäftszahl", 68, 93); doc.text("Anmerkung", 122, 93);
         doc.setFont("helvetica", "normal");
-        let y = 100;
+        let y = 102;
         aktuellerFall.behelfe.forEach((b, i) => {
             if(document.getElementById(`chkBehelf_${i}`).checked) { doc.text(b.verfasser, 18, y); doc.text(b.gz, 68, y); doc.text(b.anm, 122, y); y += 7; }
         });
