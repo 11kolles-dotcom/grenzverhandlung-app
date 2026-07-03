@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <title>ADP Rinner - Digitales Grenzprotokoll v6.2</title>
+    <title>ADP Rinner - Digitales Grenzprotokoll v6.7</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     
@@ -18,7 +18,7 @@
         body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: var(--adp-grau-hell); color: var(--adp-schwarz); }
         
         /* ================= 0. SECURITY LOGIN SCREEN ================= */
-        #loginScreen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #222; display: flex; justify-content: center; align-items: center; z-index: 10000; }
+        #loginScreen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #222; display: none; justify-content: center; align-items: center; z-index: 10000; }
         .login-card { background: white; padding: 40px; border-radius: 8px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.5); width: 100%; max-width: 400px; border-top: 6px solid var(--adp-rot); }
         .btn-login { background-color: #4f46e5; color: white; border: none; padding: 12px; width: 100%; font-weight: bold; border-radius: 4px; cursor: pointer; font-size: 1.1em; display: flex; align-items: center; justify-content: center; gap: 10px; }
         
@@ -26,13 +26,13 @@
         #startScreen { 
             position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; 
             background-color: var(--adp-schwarz);
-            display: none; justify-content: center; align-items: center; z-index: 9999; overflow: hidden;
+            display: flex; justify-content: center; align-items: center; z-index: 9999; overflow: hidden;
         }
         .bg-image-fallback { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: -2; }
         .bg-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.65); z-index: -1; }
         .start-card { background: rgba(255, 255, 255, 0.95); padding: 40px; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); text-align: center; max-width: 530px; width: 90%; border-top: 6px solid var(--adp-rot); }
         .start-card img { max-width: 280px; margin-bottom: 25px; display: block; margin-left: auto; margin-right: auto; }
-        .start-card select { width: 100%; padding: 12px; font-size: 1.05em; margin-bottom: 25px; border: 2px solid #ccc; border-radius: 4px; background: white; }
+        .start-card select { width: 100%; padding: 12px; font-size: 1.05em; margin-bottom: 25px; border: 2px solid #ccc; border-radius: 4px; background: white; color: black; }
         .btn-start { background-color: var(--adp-rot); color: white; border: none; padding: 15px; width: 100%; font-weight: bold; border-radius: 4px; cursor: pointer; font-size: 1.1em; }
         
         /* ================= 2. MAIN APP CONTAINER ================= */
@@ -60,8 +60,9 @@
         .iframe-container { width: 100%; height: 600px; border: 2px solid var(--adp-schwarz); border-radius: 4px; overflow: hidden; background: #fff; }
         .iframe-container iframe { width: 100%; height: 100%; border: none; }
 
-        /* SKIZZE INTERFACE */
-        .skizze-wrapper { position: relative; width: 100%; max-width: 900px; height: 550px; border: 2px solid var(--adp-schwarz); background-color: #fff; background-image: url('Begehungsplan.jpg'); background-size: contain; background-repeat: no-repeat; background-position: center; }
+        /* SKIZZE INTERFACE & VIEWPORT ZOOM */
+        .skizze-viewport { width: 100%; max-width: 900px; height: 550px; border: 2px solid var(--adp-schwarz); overflow: auto; background-color: #cbd5e1; position: relative; }
+        .skizze-wrapper { position: absolute; top: 0; left: 0; width: 900px; height: 550px; background-color: #fff; background-image: url('Begehungsplan.jpg'); background-size: contain; background-repeat: no-repeat; background-position: center; transform-origin: top left; transition: transform 0.1s ease; }
         #sketchCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
         
         .toolbar { display: flex; gap: 8px; flex-wrap: wrap; background: #f8fafc; padding: 12px; border: 1px solid #e2e8f0; border-radius: 4px; align-items: center; font-size: 0.9em; }
@@ -73,6 +74,7 @@
         .btn-tool { background-color: var(--adp-grau-hell); color: var(--adp-schwarz); border: 1px solid #cbd5e1; }
         .btn-tool.active { background-color: var(--adp-rot); color: white; border-color: var(--adp-rot); box-shadow: inset 0 0 5px rgba(0,0,0,0.3); }
         .btn-action { background-color: #666; color: white; }
+        .btn-zoom { background-color: #3b82f6; color: white; }
         .btn-save { background-color: var(--adp-rot); color: white; width: 100%; font-size: 1.2em; padding: 15px; margin-top: 30px; text-transform: uppercase; }
         
         .select-vermarkung { padding: 8px; font-weight: bold; border-radius: 4px; border: 1px solid #cbd5e1; }
@@ -114,7 +116,9 @@
     <div class="start-card">
         <img src="ADP_Logo_2.png" alt="ADP Rinner Logo">
         <h3>Digitale Grenzverhandlung</h3>
-        <select id="startGzSelect"></select>
+        <select id="startGzSelect">
+            <!-- Wird direkt via JS befüllt -->
+        </select>
         <button class="btn-start" onclick="startVerhandlung()">Grenzverhandlung starten</button>
     </div>
 </div>
@@ -207,7 +211,15 @@
                     <button class="btn btn-tool" id="tool-vermarkung_sym" onclick="activateVermarkungTool()">Symbol setzen</button>
                 </div>
 
-                <!-- Sektion 3: Freitexteingabe & Löschen -->
+                <!-- Sektion 3: Zoom-Unterstützung im Feld -->
+                <div class="toolbar-section">
+                    <span class="toolbar-label">🔍 Zoom:</span>
+                    <button class="btn btn-zoom" onclick="zoomCanvas(0.25)">➕ Zoom In</button>
+                    <button class="btn btn-zoom" onclick="zoomCanvas(-0.25)">➖ Zoom Out</button>
+                    <button class="btn btn-tool" style="background:#e2e8f0;" onclick="resetZoomCanvas()">1:1</button>
+                </div>
+
+                <!-- Sektion 4: Freitexteingabe & Löschen -->
                 <div class="toolbar-section">
                     <span class="toolbar-label">💬 Text:</span>
                     <button class="btn btn-tool" id="tool-text" onclick="setTool('text', '#9b1b22', 1, [])">A Text</button>
@@ -221,7 +233,12 @@
                 <button class="btn" style="background:#3b82f6; color:white;" onclick="simulateExternalAppOpen()">In QField zeichnen</button>
                 <input type="file" id="externalSkizzeInput" accept="image/*" onchange="importExternalSkizze(event)">
             </div>
-            <div class="skizze-wrapper"><canvas id="sketchCanvas" width="900" height="550"></canvas></div>
+            
+            <div class="skizze-viewport">
+                <div class="skizze-wrapper" id="skizzeWrapperContainer">
+                    <canvas id="sketchCanvas" width="900" height="550"></canvas>
+                </div>
+            </div>
         </div>
 
         <div id="tab-seite3" class="tab-content">
@@ -268,6 +285,7 @@
     const nameVerhandlungsleiter = "DI Gerald Fuxjäger";
     let externalImageLoaded = false;
     let signatureTracks = [];
+    let currentZoomFactor = 1.0; 
 
     function getSafeImageData(imgId, format) {
         try {
@@ -305,11 +323,16 @@
     let aktuellerFall = datenbank[0];
     let activeCanvasIds = [];
 
+    window.addEventListener('DOMContentLoaded', () => {
+        const startSelect = document.getElementById('startGzSelect');
+        if(startSelect) {
+            startSelect.innerHTML = `<option value="0">${aktuellerFall.gz}</option>`;
+        }
+    });
+
     function simulateLogin() {
         document.getElementById('loginScreen').style.display = 'none';
         document.getElementById('startScreen').style.display = 'flex';
-        const startSelect = document.getElementById('startGzSelect');
-        startSelect.innerHTML = `<option value="0">${aktuellerFall.gz}</option>`;
     }
 
     function startVerhandlung() {
@@ -338,7 +361,7 @@
             eBody.innerHTML += `<tr><td><strong>${e.ez}</strong></td><td><strong>${e.gst}</strong></td><td>${e.name}<br><small>${e.adr}</small></td><td class="sig-box-container"><canvas id="${cId}" width="280" height="55" class="sig-canvas"></canvas></td><td><input type="text" id="txtId_${i}" placeholder="z.B. Reisepass..." style="width:90%; padding:5px; text-align:center;"></td></tr>`;
         });
 
-        setTimeout(() => { activeCanvasIds.forEach(id => setupCanvas(id, true)); setupCanvas('sketchCanvas', false); }, 150);
+        setTimeout(() => { activeCanvasIds.forEach(id => setupCanvas(id, true)); setupCanvas('sketchCanvas', false); resetZoomCanvas(); }, 150);
     }
 
     function openGfnViewer(title, pdfFile) {
@@ -407,10 +430,31 @@
         setTool('vermarkung_' + typ, color, 2, []);
     }
 
+    function zoomCanvas(amount) {
+        currentZoomFactor += amount;
+        if(currentZoomFactor < 0.5) currentZoomFactor = 0.5; 
+        if(currentZoomFactor > 3.0) currentZoomFactor = 3.0; 
+        document.getElementById('skizzeWrapperContainer').style.transform = `scale(${currentZoomFactor})`;
+    }
+
+    function resetZoomCanvas() {
+        currentZoomFactor = 1.0;
+        document.getElementById('skizzeWrapperContainer').style.transform = `scale(1)`;
+    }
+
     function setupCanvas(canvasId, isSig) {
         const canvas = document.getElementById(canvasId); if (!canvas) return;
         const ctx = canvas.getContext('2d'); let drawing = false;
-        const getPos = (e) => { const rect = canvas.getBoundingClientRect(); return { x: (e.clientX - rect.left) * (canvas.width / rect.width), y: (e.clientY - rect.top) * (canvas.height / rect.height) }; };
+        
+        const getPos = (e) => { 
+            const rect = canvas.getBoundingClientRect(); 
+            let scaleX = canvas.width / rect.width;
+            let scaleY = canvas.height / rect.height;
+            return { 
+                x: (e.clientX - rect.left) * scaleX, 
+                y: (e.clientY - rect.top) * scaleY 
+            }; 
+        };
         
         canvas.addEventListener('pointerdown', (e) => {
             e.preventDefault(); const p = getPos(e);
@@ -438,10 +482,10 @@
                         ctx.moveTo(p.x + 4, p.y - 4); ctx.lineTo(p.x - 4, p.y + 4);
                     }
                     else if (abkuerzung === 'behauen') {
-                        abkuerzung = "GS beh.";
+                        abkuerzung = "GSb";
                     }
                     else if (abkuerzung === 'unbehauen') {
-                        abkuerzung = "GS unb.";
+                        abkuerzung = "GSu";
                     }
                     
                     ctx.stroke();
@@ -506,7 +550,6 @@
         doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.text("Protokoll über die Festlegung des Grenzverlaufs", 15, 38);
         doc.setFont("helvetica", "normal"); doc.setFontSize(9);
         
-        // INTEGRATION DES NEUEN ERÖFFNUNGSTEXTES IM PDF-EXPORT
         let seite1Eroeffnungstext = `Die Verhandlung wird am ${fDat} um ${uhrzeitEroeffnung} Uhr in ${ortEroeffnung} von ${nameVerhandlungsleiter} eröffnet. Der Verhandlungsleiter überzeugt sich von der Persönlichkeit der anwesenden Personen und überprüft die Vertretungsbefugnis.`;
         doc.text(doc.splitTextToSize(seite1Eroeffnungstext, 180), 15, 46);
         
