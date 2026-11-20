@@ -54,37 +54,16 @@
     </div>
   </div>
   <div id="v-tools" class="viewer-tools" hidden>
-    <div class="seg" role="group" aria-label="Werkzeug">
+    <div class="seg big" role="group" aria-label="Werkzeug">
       <button type="button" data-tool="pen" class="on"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l4-1 11-11-3-3L5 16z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>Stift</button>
-      <button type="button" data-tool="symbol"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/></svg>Grenzzeichen</button>
-      <button type="button" data-tool="text"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14M12 6v13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>Text</button>
       <button type="button" data-tool="erase"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 16l8-8 6 6-5 5H8zM13 19h7" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>Radierer</button>
-      <button type="button" data-tool="hand"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 12V6a1.5 1.5 0 013 0v5V4.5a1.5 1.5 0 013 0V11V6a1.5 1.5 0 013 0v8a6 6 0 01-6 6h-1a6 6 0 01-5-3l-2-4a1.5 1.5 0 012.5-1.6z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>Verschieben</button>
     </div>
-    <select id="v-symbol" class="symbol-select" aria-label="Art des Grenzzeichens" hidden>
-      <option value="GS">GS – Grenzstein</option>
-      <option value="MM" selected>MM – Marke Metall</option>
-      <option value="MK">MK – Marke Kunststoff</option>
-      <option value="ER">ER – Rohr (Eisen)</option>
-      <option value="NG">NG – Vermessungsnagel</option>
-      <option value="HN">HN – Hiltinagel</option>
-      <option value="ME">ME – Mauerecke</option>
-      <option value="HE">HE – Hausecke</option>
-      <option value="ZS">ZS – Zaunsäule</option>
-    </select>
-    <div class="seg" role="group" aria-label="Farbe">
-      <button type="button" data-color="#d0021b" class="swatch on" style="--sw:#d0021b" aria-label="Rot, neu"></button>
-      <button type="button" data-color="#111111" class="swatch" style="--sw:#111111" aria-label="Schwarz, alt"></button>
-      <button type="button" data-color="#0b57d0" class="swatch" style="--sw:#0b57d0" aria-label="Blau"></button>
-      <button type="button" data-color="#108a3e" class="swatch" style="--sw:#108a3e" aria-label="Grün"></button>
+    <div class="seg big" role="group" aria-label="Farbe">
+      <button type="button" data-color="#d0021b" class="swatch on" style="--sw:#d0021b" aria-label="Rot (neu)" title="Rot – neu"></button>
+      <button type="button" data-color="#111111" class="swatch" style="--sw:#111111" aria-label="Schwarz (Bestand)" title="Schwarz – Bestand"></button>
+      <button type="button" data-color="#0b57d0" class="swatch" style="--sw:#0b57d0" aria-label="Blau" title="Blau"></button>
     </div>
-    <div class="seg" role="group" aria-label="Strichstärke">
-      <button type="button" data-width="0.8">fein</button>
-      <button type="button" data-width="1.6" class="on">mittel</button>
-      <button type="button" data-width="3">dick</button>
-    </div>
-    <button id="v-undo" type="button" class="btn">↶ Rückgängig</button>
-    <label class="check small"><input id="v-finger" type="checkbox"> mit Finger zeichnen</label>
+    <button id="v-undo" type="button" class="btn" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14L4 9l5-5M4 9h10a6 6 0 010 12h-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Rückgängig</button>
   </div>
   <div id="v-stage" class="viewer-stage">
     <div id="v-sheet" class="sheet">
@@ -92,11 +71,6 @@
       <canvas id="v-ink"></canvas>
     </div>
     <div id="v-hint" class="v-hint" hidden></div>
-  </div>
-  <div id="v-textbox" class="textbox" hidden>
-    <input id="v-textinput" type="text" placeholder="Text, z. B. GP 4325 neu" aria-label="Text für die Skizze">
-    <button id="v-textok" type="button" class="btn primary">Einfügen</button>
-    <button id="v-textcancel" type="button" class="btn">Abbrechen</button>
   </div>
 </div>
 

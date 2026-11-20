@@ -1,6 +1,12 @@
-# Digitale Grenzverhandlung – Prototyp 0.3 (ADP Rinner)
+# Digitale Grenzverhandlung – Prototyp 0.4 (ADP Rinner)
 
 Offline-Web-App (PWA) für die Grenzverhandlung nach § 43 Abs. 6 VermG. Prototyp zur Masterarbeit „Anwendung von E-Geo-Government in der österreichischen Katastervermessung“ (TU Graz), Kapitel 6.5.
+
+## Neu in 0.4
+
+- Skizze nur noch freihand: Stift und Radierer, drei Farben, Rückgängig. Ohne Stift zeichnet ein Finger, zwei Finger zoomen. Sobald ein Stift erkannt wird, verschiebt der Finger nur noch.
+- Ablauf auf 6 Schritte verkürzt: Eröffnung (mit GFN und Anwesenden), Skizze, Grenzverlauf, Abschluss, Zustimmung, Export
+- Verhandlungsleiter DI Gerald Fuxjäger vorbelegt
 
 ## Neu in 0.3
 

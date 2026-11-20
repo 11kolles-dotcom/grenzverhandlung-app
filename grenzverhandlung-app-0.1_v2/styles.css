@@ -336,3 +336,29 @@ input:disabled, select:disabled, textarea:disabled { background: var(--surface-2
 .sigpad-line { position: absolute; left: 6%; right: 6%; bottom: 26%; border-bottom: 1.5px solid #c9c4bd; }
 .sigpad-x { position: absolute; left: 6%; bottom: calc(26% + 4px); color: #9a948c; font-weight: 700; }
 .sig-thumb { max-width: 220px; max-height: 70px; object-fit: contain; background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 4px; margin-top: 4px; }
+
+/* 0.4: vereinfachte Eröffnung und Skizze */
+.opener { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 18px; border-top: 5px solid var(--brand); }
+.opener-info { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.opener .gzbig { font-size: 2rem; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.opened { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 14px; background: var(--good-soft); color: var(--good); }
+.opened svg { width: 26px; height: 26px; }
+.opened strong { color: var(--ink); display: block; }
+.kopf summary { cursor: pointer; font-weight: 600; color: var(--muted); min-height: 28px; }
+button.sketch-preview { position: relative; width: 100%; padding: 0; font: inherit; color: inherit; }
+.sketch-cta { position: absolute; right: 14px; bottom: 14px; display: inline-flex; align-items: center; gap: 8px; padding: 12px 18px; border-radius: 999px; background: var(--brand); color: var(--brand-ink); font-weight: 700; box-shadow: 0 6px 18px rgba(0,0,0,.25); }
+.sketch-cta svg { width: 18px; height: 18px; }
+.seg.big button { min-height: 52px; min-width: 56px; padding: 6px 16px; font-size: 1rem; }
+.seg.big .swatch { width: 56px; }
+.seg.big .swatch::after { inset: 13px; }
+#v-undo { min-height: 52px; }
+#v-undo:disabled { opacity: .4; }
+@media (max-width: 640px) {
+  #v-zoomout, #v-zoomin, #v-zoomlabel { display: none; }
+  .viewer-tools { justify-content: space-between; }
+  .seg.big button { padding: 6px 10px; }
+  #v-undo { padding: 0 12px; font-size: 0; gap: 0; }
+  #v-undo svg { width: 22px; height: 22px; }
+  .opener .gzbig { font-size: 1.6rem; }
+  .opener-action, .opener-action .btn { width: 100%; }
+}
