@@ -5,7 +5,7 @@
  */
 'use strict';
 
-const APP_VERSION = '0.8.3';
+const APP_VERSION = '0.8.4';
 const EGIZ_URL = 'https://pdf.egiz.gv.at/';
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'libs/pdf.worker.min.js';
 
@@ -1524,7 +1524,7 @@ const Viewer = {
     const sheet = $('#v-sheet');
     sheet.style.width = st.pw * st.fit + 'px'; sheet.style.height = st.ph * st.fit + 'px';
     for (const c of [$('#v-pdf'), $('#v-ink')]) { c.style.width = st.pw * st.fit + 'px'; c.style.height = st.ph * st.fit + 'px'; }
-    st.zoom = 1; st.rs = 0;
+    st.zoom = 1; st.rs = 0; st.detail = null; $('#v-detail').hidden = true;
     st.tx = (stage.width - st.pw * st.fit) / 2; st.ty = (stage.height - st.ph * st.fit) / 2;
     $('#v-pageinfo').textContent = `${st.page} / ${st.pages}`;
     this.applyTransform();
@@ -1534,15 +1534,23 @@ const Viewer = {
     const st = this.st;
     $('#v-sheet').style.transform = `translate(${st.tx}px, ${st.ty}px) scale(${st.zoom})`;
     $('#v-zoomlabel').textContent = Math.round(st.zoom * 100) + ' %';
+    if (st.detail) this.scheduleRender(); // Detailausschnitt folgt dem Verschieben
   },
   scheduleRender() { clearTimeout(this.rt); this.rt = setTimeout(() => this.render(), 180); },
   async render() {
     const st = this.st; if (!st || !st.pdfPage) return;
     const dpr = window.devicePixelRatio || 1;
     let rs = st.fit * st.zoom * dpr;
-    const maxPx = 14e6;
+    const want = rs, maxPx = 14e6;
     if (st.pw * rs * st.ph * rs > maxPx) rs = Math.sqrt(maxPx / (st.pw * st.ph));
-    if (Math.abs(rs - st.rs) / Math.max(rs, 0.01) < 0.05 && $('#v-pdf').width) return;
+    if (!(Math.abs(rs - st.rs) / Math.max(rs, 0.01) < 0.05 && $('#v-pdf').width)) await this.renderBase(rs);
+    if (this.st !== st) return;
+    // Große Pläne: die ganze Seite ist auf ca. 14 MP begrenzt. Darüber hinaus wird nur der sichtbare Ausschnitt scharf nachgerendert.
+    if (want > rs * 1.05) await this.renderDetail(want); else { st.detail = null; $('#v-detail').hidden = true; }
+    if (this.st === st) this.drawInk();
+  },
+  async renderBase(rs) {
+    const st = this.st;
     st.rs = rs;
     const vp = st.pdfPage.getViewport({ scale: rs });
     const off = document.createElement('canvas');
@@ -1553,13 +1561,47 @@ const Viewer = {
     if (this.st !== st) return;
     const c = $('#v-pdf'); c.width = off.width; c.height = off.height; c.getContext('2d').drawImage(off, 0, 0);
     const ink = $('#v-ink'); ink.width = off.width; ink.height = off.height;
-    this.drawInk();
+  },
+  async renderDetail(rd) {
+    const st = this.st, stage = $('#v-stage').getBoundingClientRect();
+    const W = st.pw * st.fit, H = st.ph * st.fit, vw = stage.width / st.zoom, vh = stage.height / st.zoom;
+    // sichtbarer Bereich in Blatt-Pixeln, mit Rand zum Verschieben
+    const x0 = Math.max(0, -st.tx / st.zoom - vw * 0.25), y0 = Math.max(0, -st.ty / st.zoom - vh * 0.25);
+    const x1 = Math.min(W, -st.tx / st.zoom + vw * 1.25), y1 = Math.min(H, -st.ty / st.zoom + vh * 1.25);
+    if (x1 <= x0 || y1 <= y0) return;
+    const d = st.detail;
+    if (d && d.rd === rd && x0 >= d.x0 && y0 >= d.y0 && x1 <= d.x1 && y1 <= d.y1 && -st.tx / st.zoom >= d.x0 && -st.ty / st.zoom >= d.y0
+      && (-st.tx + stage.width) / st.zoom <= d.x1 && (-st.ty + stage.height) / st.zoom <= d.y1) return; // Ausschnitt reicht noch
+    const k = rd / st.fit, ox = Math.round(x0 * k), oy = Math.round(y0 * k);
+    const off = document.createElement('canvas');
+    off.width = Math.ceil((x1 - x0) * k); off.height = Math.ceil((y1 - y0) * k);
+    const ctx = off.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, off.width, off.height);
+    if (st.detailTask) { try { st.detailTask.cancel(); } catch (_) {} }
+    st.detailTask = st.pdfPage.render({ canvasContext: ctx, viewport: st.pdfPage.getViewport({ scale: rd }), transform: [1, 0, 0, 1, -ox, -oy] });
+    try { await st.detailTask.promise; } catch (e) { if (e && e.name === 'RenderingCancelledException') return; throw e; }
+    if (this.st !== st) return;
+    st.detail = { pdf: off, rd, k: rd, ox, oy, x0, y0, x1, y1 };
+    const c = $('#v-detail'); c.width = off.width; c.height = off.height;
+    Object.assign(c.style, { left: ox / k + 'px', top: oy / k + 'px', width: off.width / k + 'px', height: off.height / k + 'px' });
+    c.hidden = false;
+  },
+  /* Zeichenflächen: ganze Seite und (bei starkem Zoom) der scharfe Ausschnitt */
+  inkTargets() {
+    const st = this.st, ink = $('#v-ink'), t = [{ ctx: ink.getContext('2d'), k: ink.width / st.pw, ox: 0, oy: 0 }];
+    if (st.detail) t.push({ ctx: $('#v-detail').getContext('2d'), k: st.detail.k, ox: st.detail.ox, oy: st.detail.oy });
+    return t;
   },
   drawInk() {
     const st = this.st; if (!st) return;
     const ink = $('#v-ink'), ctx = ink.getContext('2d');
     ctx.clearRect(0, 0, ink.width, ink.height);
     if (st.ink) paintInk(ctx, st.ink, st.page, ink.width / st.pw);
+    if (st.detail) {
+      const dc = $('#v-detail').getContext('2d'), d = st.detail;
+      dc.setTransform(1, 0, 0, 1, 0, 0); dc.drawImage(d.pdf, 0, 0);
+      dc.setTransform(1, 0, 0, 1, -d.ox, -d.oy);
+      if (st.ink) paintInk(dc, st.ink, st.page, d.k);
+    }
   },
   toPage(e) {
     const st = this.st, r = $('#v-stage').getBoundingClientRect();
@@ -1567,7 +1609,7 @@ const Viewer = {
   },
   zoomAt(factor, cx, cy) {
     const st = this.st;
-    const nz = Math.min(12, Math.max(0.5, st.zoom * factor));
+    const nz = Math.min(40, Math.max(0.5, st.zoom * factor));
     const f = nz / st.zoom;
     st.tx = cx - (cx - st.tx) * f; st.ty = cy - (cy - st.ty) * f; st.zoom = nz;
     this.applyTransform(); this.scheduleRender();
@@ -1593,13 +1635,14 @@ const Viewer = {
   drawPreview() {
     const st = this.st, s = st.drawing.s, end = st.drawing.end; if (!end) return;
     this.drawInk();
-    const ctx = $('#v-ink').getContext('2d'), k = $('#v-ink').width / st.pw;
-    ctx.save(); ctx.lineCap = 'round'; ctx.strokeStyle = s.color; ctx.lineWidth = s.width * k;
+    for (const { ctx, k, ox, oy } of this.inkTargets()) {
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, -ox, -oy); ctx.lineCap = 'round'; ctx.strokeStyle = s.color; ctx.lineWidth = s.width * k;
     ctx.setLineDash(s.dash ? dashOf(s.width).map(x => x * k) : []);
     ctx.beginPath(); ctx.moveTo(s.points[0][0] * k, s.points[0][1] * k); ctx.lineTo(end[0] * k, end[1] * k); ctx.stroke();
     ctx.setLineDash([]); ctx.lineWidth = Math.max(1.5, 2 * (window.devicePixelRatio || 1)); ctx.strokeStyle = s.color;
     for (const q of [s.points[0], end]) if (q[2]) { ctx.beginPath(); ctx.arc(q[0] * k, q[1] * k, 9 * (window.devicePixelRatio || 1), 0, Math.PI * 2); ctx.stroke(); }
     ctx.restore();
+    }
   },
   startDraw(e) {
     const st = this.st, p = this.toPage(e);
@@ -1647,14 +1690,17 @@ const Viewer = {
       const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
       if (st.drawing.erase) { for (const ev of evs) this.eraseAt(this.toPage(ev)); return; }
       if (st.drawing.line) { st.drawing.end = this.snap(this.toPage(e)); st.drawing.moved = true; this.drawPreview(); return; }
-      const s = st.drawing.s, ctx = $('#v-ink').getContext('2d'), k = $('#v-ink').width / st.pw;
-      ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = s.color; ctx.lineWidth = s.width * k;
-      ctx.setLineDash(s.dash ? dashOf(s.width).map(x => x * k) : []); ctx.lineDashOffset = -(s.len || 0) * k;
+      const s = st.drawing.s, T = this.inkTargets();
       for (const ev of evs) {
         const p = this.toPage(ev), last = s.points[s.points.length - 1];
         if (Math.hypot(p[0] - last[0], p[1] - last[1]) < 0.4 / st.zoom) continue;
-        ctx.beginPath(); ctx.moveTo(last[0] * k, last[1] * k); ctx.lineTo(p[0] * k, p[1] * k); ctx.stroke();
-        s.len = (s.len || 0) + Math.hypot(p[0] - last[0], p[1] - last[1]); ctx.lineDashOffset = -s.len * k;
+        for (const { ctx, k, ox, oy } of T) {
+          ctx.setTransform(1, 0, 0, 1, -ox, -oy);
+          ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = s.color; ctx.lineWidth = s.width * k;
+          ctx.setLineDash(s.dash ? dashOf(s.width).map(x => x * k) : []); ctx.lineDashOffset = -(s.len || 0) * k;
+          ctx.beginPath(); ctx.moveTo(last[0] * k, last[1] * k); ctx.lineTo(p[0] * k, p[1] * k); ctx.stroke();
+        }
+        s.len = (s.len || 0) + Math.hypot(p[0] - last[0], p[1] - last[1]);
         s.points.push([Math.round(p[0] * 100) / 100, Math.round(p[1] * 100) / 100]);
       }
       return;

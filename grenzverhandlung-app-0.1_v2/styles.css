@@ -453,3 +453,7 @@ a.doc-open { text-decoration: none; }
 
 /* Verhandlungsleiter */
 .card.owner.leiter { border-style: dashed; }
+
+/* scharfer Ausschnitt bei starkem Zoom */
+#v-detail { pointer-events: none; }
+#v-detail[hidden] { display: none; }
