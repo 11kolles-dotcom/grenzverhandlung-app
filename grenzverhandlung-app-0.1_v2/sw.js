@@ -1,5 +1,5 @@
 /* Offline-Cache: alle App-Dateien werden beim ersten Aufruf gespeichert, Demo-Dateien beim ersten Laden */
-const CACHE = 'gv-0.5.1';
+const CACHE = 'gv-0.5.2';
 const FILES = ['./', 'index.html', 'styles.css', 'app.js', 'paket.html', 'paket.js', 'manifest.webmanifest', 'icon.svg', 'icon-192.png', 'icon-512.png',
   'libs/pdf.min.js', 'libs/pdf.worker.min.js', 'libs/pdf-lib.min.js', 'libs/jszip.min.js',
   'assets/logo.png', 'assets/hintergrund.jpg',

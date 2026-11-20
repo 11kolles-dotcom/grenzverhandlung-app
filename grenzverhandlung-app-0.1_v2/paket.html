@@ -45,13 +45,19 @@
   <p class="muted" style="margin:0">Daten eintragen, PDFs hineinziehen und das ZIP speichern. Das ZIP in den Projektordner legen und am Tablet in der App importieren. Nichts davon verlässt diesen PC.</p>
 
   <section class="card">
+    <div><h2>Schnellstart: euer Protokoll einlesen</h2><p class="muted" style="margin:0">Das vorbereitete Protokoll (PDF aus Word, nicht gescannt) hineinziehen. Übernommen werden Vermessungsamt, KG, Projekt (GZ), Ort und alle Eigentümer aus der Zustimmungserklärung mit EZ, Gst.-Nr. und Anschrift.</p></div>
+    <div class="drop" id="drop-prot"><strong>Protokoll (PDF) hierher ziehen</strong> oder klicken</div>
+  </section>
+
+  <section class="card">
     <div><h2>1 · Kopfdaten</h2></div>
     <div class="form-grid" id="kopf"></div>
   </section>
 
   <section class="card">
     <div><h2>2 · Beteiligte</h2><p class="muted" style="margin:0">Eigentümer laut Grundbuch, bekannte Vertreter. Keine Telefonnummern oder E-Mail-Adressen (DSGVO).</p></div>
-    <div class="drop" id="drop-gb"><strong>Grundbuchsabfrage hierher ziehen</strong> oder klicken<br><span style="font-size:.85rem">beide CSV-Dateien gemeinsam: Eigentümer und Grundstücke (Zuordnung über die EZ)</span></div>
+    <details><summary class="muted">Alternativ: Grundbuchsabfrage (CSV) einlesen</summary>
+    <div class="drop" id="drop-gb" style="margin-top:8px"><strong>Grundbuchsabfrage hierher ziehen</strong> oder klicken<br><span style="font-size:.85rem">beide CSV-Dateien gemeinsam: Eigentümer und Grundstücke (Zuordnung über die EZ). Übernimmt alle Eigentümer der Abfrage, nicht betroffene danach entfernen.</span></div></details>
     <div class="pk-scroll"><table class="pk-table" id="bet"><thead><tr><th style="width:150px">Rolle</th><th style="width:80px">EZ</th><th style="width:90px">Gst.-Nr.</th><th>Name</th><th>Anschrift</th><th>vertritt</th><th class="x"></th></tr></thead><tbody></tbody></table></div>
     <div class="row">
       <button class="btn small" type="button" id="add-bet">+ Person</button>
@@ -86,6 +92,7 @@
 </div>
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 <script src="libs/jszip.min.js"></script>
+<script src="libs/pdf.min.js"></script>
 <script src="paket.js"></script>
 </body>
 </html>

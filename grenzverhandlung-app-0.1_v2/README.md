@@ -7,7 +7,8 @@ Offline-Web-App (PWA) für die Grenzverhandlung nach § 43 Abs. 6 VermG. Prototy
 - Unterlagen: Angebot, Einladungen und andere PDFs kommen im Ordner `unterlagen/` des Verhandlungspakets mit und sind in der App über den Knopf „Unterlagen“ oben jederzeit einsehbar. Vor Ort lassen sich weitere PDFs ergänzen; diese gehen beim Export mit.
 - Büro-Seite `paket.html` („Paket erstellen“): Kopfdaten, Beteiligte (auch aus Excel einfügen), GFN, Skizze und Unterlagen eintragen bzw. hineinziehen und als ZIP speichern
 - Demo enthält eine fiktive Einladung und ein fiktives Angebot
-- Grundbuchsabfrage: In „Paket erstellen“ die beiden CSV-Dateien (Eigentümer und Grundstücke) gemeinsam hineinziehen. Die Eigentümer werden mit Titel, Anschrift, EZ und Gst.-Nr. übernommen (Zuordnung über KG und EZ), die GFN aus der Grundstücksabfrage als Behelfe vorgeschlagen; GFN-PDFs werden über die Nummer im Dateinamen zugeordnet. Geburtsdaten und Anteile werden nicht übernommen.
+- Protokoll der Kanzlei einlesen: In „Paket erstellen“ das vorbereitete Protokoll (Word-PDF) hineinziehen. Übernommen werden Vermessungsamt, KG, Projekt (GZ), Ort und die Eigentümer aus der Zustimmungserklärung mit EZ, Gst.-Nr. und Anschrift; das PDF selbst kommt als Unterlage mit.
+- Alternativ Grundbuchsabfrage: In „Paket erstellen“ die beiden CSV-Dateien (Eigentümer und Grundstücke) gemeinsam hineinziehen. Die Eigentümer werden mit Titel, Anschrift, EZ und Gst.-Nr. übernommen (Zuordnung über KG und EZ), die GFN aus der Grundstücksabfrage als Behelfe vorgeschlagen; GFN-PDFs werden über die Nummer im Dateinamen zugeordnet. Geburtsdaten und Anteile werden nicht übernommen.
 - Fotos: Knopf „Fotos“ oben, Aufnahme mit der Kamera des Tablets, Notiz je Foto. Die Fotos gehen beim Export im Ordner `fotos/` ins Büro, nicht ins Protokoll.
 - Links zum Kataster des BEV und zu GIS Steiermark im Bereich „Unterlagen“ (brauchen Internet)
 
