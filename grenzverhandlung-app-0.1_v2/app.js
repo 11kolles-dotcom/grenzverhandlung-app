@@ -5,7 +5,7 @@
  */
 'use strict';
 
-const APP_VERSION = '0.5.0';
+const APP_VERSION = '0.6.0';
 const EGIZ_URL = 'https://pdf.egiz.gv.at/';
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'libs/pdf.worker.min.js';
 
@@ -449,8 +449,8 @@ VIEWS.start = async page => {
       h('div', { class: 'head' },
         h('img', { src: 'assets/logo.png', alt: 'Vermessung ADP Rinner', width: 309, height: 92 }),
         h('div', {}, h('span', { class: 'eyebrow' }, 'Digitale Grenzverhandlung'),
-          h('h1', {}, 'Welche Verhandlung führst du heute?'),
-          h('p', { class: 'muted' }, 'Geschäftszahl wählen. Alle Unterlagen liegen am Gerät, die Verhandlung läuft auch ohne Netz.'))),
+          h('h1', {}, 'Wähle ein Projekt'),
+          h('p', { class: 'muted' }, 'Projekt nach Geschäftszahl antippen. Alle Unterlagen liegen am Gerät, die Verhandlung läuft auch ohne Netz.'))),
       list,
       h('div', { class: 'foot' },
         h('button', { class: 'btn primary', type: 'button', onclick: () => $('#file-zip').click() }, icon('upload'), 'Verhandlungspaket importieren'),
