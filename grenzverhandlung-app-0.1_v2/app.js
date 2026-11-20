@@ -1124,11 +1124,6 @@ async function buildProtocol(v, opts = {}) {
   centered('und § 52 Z 5 VermG', 9, FB, 0);
   y -= 10;
   heading('Verzeichnis der Eigentümer, allfälliger Vertreter und anwesender Personen');
-  const anw = v.beteiligte.filter(b => b.anwesend);
-  table([{ t: 'Name und Anschrift', w: 0.38 }, { t: 'Rolle', w: 0.22 }, { t: 'ID*', w: 0.08 }, { t: 'Vollmacht*', w: 0.13 }, { t: 'EZ / Gst.Nr.', w: 0.19 }],
-    anw.length ? anw.map(b => [`${b.name}\n${b.anschrift}`, b.rolle === 'Vertreter' && b.vertritt ? `Vertreter für ${b.vertritt}` : b.rolle, b.idnachweis || '', b.vollmacht || '', [b.ez, b.gst].filter(Boolean).join(' / ')]) : [['', '', '', '', '']],
-    { size: 8.5, x0: M + 7, x1: W - M + 2 });
-  y -= 8;
   para(`Die Verhandlung über den Grenzverlauf wird am ${deDate(v.meta.datum) || '……………'} um ${v.meta.eroeffnung || '. . . . . . . .'} Uhr in ${ortKurz || '…'} eröffnet. Der Verhandlungsleiter überzeugt sich von der Persönlichkeit der anwesenden Personen und prüft die Vertretungsbefugnis.`);
   y -= 10;
   heading('Gegenstand der Verhandlung');
@@ -1169,8 +1164,11 @@ async function buildProtocol(v, opts = {}) {
     if (z === 'stift' && imgs.has(b.id)) return { text: '', img: imgs.get(b.id) };
     return { qes: 'QES (ID Austria)', papier: 'Unterschrift auf Papier', verweigert: 'verweigert', offen: '' }[z] || '';
   };
+  // Vertreter und Vollmacht beim vertretenen Eigentümer vermerken (die Tabelle der Anwesenden entfällt laut Vorlage)
+  const vertreterVon = b => v.beteiligte.filter(x => x.rolle === 'Vertreter' && x.anwesend && x.vertritt && b.name.toLowerCase().includes(x.vertritt.toLowerCase()))
+    .map(x => `vertreten durch ${x.name}${x.idnachweis ? ` (ID: ${x.idnachweis})` : ''}${x.vollmacht ? `, ${x.vollmacht}` : ''}`).join('; ');
   const rows = ow.map(b => [b.ez, b.gst.split(/,\s*/).join('\n'), `${b.name}\n${b.anschrift.split(/,\s*/).join('\n')}`, cellSig(b),
-    [b.idnachweis && `ID: ${b.idnachweis}`, b.anwesend ? '' : 'nicht anwesend', opts.unterschriften && b.zustimmung.art === 'stift' ? 'Stift, nur Information' : '', b.anmerkung].filter(Boolean).join(', ')]);
+    [b.idnachweis && `ID: ${b.idnachweis}`, b.anwesend ? '' : 'nicht anwesend', vertreterVon(b), opts.unterschriften && b.zustimmung.art === 'stift' ? 'Stift, nur Information' : '', b.anmerkung].filter(Boolean).join(', ')]);
   if (!rows.length) rows.push(['', '', '', '', '']);
   table([{ t: 'EZ', w: 0.095 }, { t: 'Gst.Nr.', w: 0.152 }, { t: 'Name und Anschrift\ndes Eigentümers', w: 0.303 }, { t: 'Unterschrift', w: 0.284 }, { t: 'Anmerkung', w: 0.166 }],
     rows, { size: 8.5, minRow: 46, headH: 36, headSize: 8.5, gapHead: 3, x0: M + 5, x1: W - M + 8 });
