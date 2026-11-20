@@ -2,6 +2,10 @@
 
 Offline-Web-App (PWA) für die Grenzverhandlung nach § 43 Abs. 6 VermG. Prototyp zur Masterarbeit „Anwendung von E-Geo-Government in der österreichischen Katastervermessung“ (TU Graz), Kapitel 6.5.
 
+## Neu in 0.7
+
+- Skizze: Werkzeuge Stift, Linie (gerade, rastet an Linienenden ein) und Radierer (löscht ganze Striche); Farben Schwarz, Rot, Blau, Grün; Strich fein/dick und gestrichelt; Rückgängig und Wiederholen. Gestrichelte Linien erscheinen auch in der Protokoll-Beilage gestrichelt.
+
 ## Neu in 0.5
 
 - Unterlagen: Angebot, Einladungen und andere PDFs kommen im Ordner `unterlagen/` des Verhandlungspakets mit und sind in der App über den Knopf „Unterlagen“ oben jederzeit einsehbar. Vor Ort lassen sich weitere PDFs ergänzen; diese gehen beim Export mit.

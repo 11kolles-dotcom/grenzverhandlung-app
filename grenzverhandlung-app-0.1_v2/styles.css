@@ -417,3 +417,26 @@ a.doc-open { text-decoration: none; }
 .name-row { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
 .pill.invite::before { display: none; }
 .pill.invite svg { width: 14px; height: 14px; }
+
+/* ---------- 0.7 Skizze: Werkzeugleiste ---------- */
+.viewer-tools { gap: 10px; }
+.viewer-tools .seg.big button span { margin-left: 2px; }
+.viewer-tools .seg.big button svg { width: 22px; height: 22px; }
+.viewer-tools .seg.big button.on { background: var(--brand); color: var(--brand-ink); }
+.viewer-tools [data-width].on, .viewer-tools #v-dash.on { background: var(--ink) !important; color: var(--surface) !important; }
+.viewer-tools .colors .swatch.on { background: var(--surface-2) !important; }
+.seg.big .swatch::after { inset: 12px; border: 2px solid rgba(0,0,0,.25); }
+.v-hist { display: inline-flex; gap: 8px; margin-left: auto; }
+#v-undo, #v-redo { min-height: 52px; }
+#v-redo:disabled { opacity: .4; }
+@media (max-width: 900px) {
+  .viewer-tools .seg.big button span, #v-undo span, #v-redo span { display: none; }
+  #v-undo, #v-redo { padding: 0 12px; gap: 0; }
+}
+@media (max-width: 640px) {
+  .viewer-tools { gap: 6px; }
+  .seg.big button { min-width: 44px; padding: 6px 8px; }
+  .seg.big .swatch { width: 44px; }
+  .seg.big .swatch::after { inset: 10px; }
+  .v-hist { margin-left: 0; }
+}

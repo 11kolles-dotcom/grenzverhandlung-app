@@ -5,7 +5,7 @@
  */
 'use strict';
 
-const APP_VERSION = '0.6.0';
+const APP_VERSION = '0.7.0';
 const EGIZ_URL = 'https://pdf.egiz.gv.at/';
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'libs/pdf.worker.min.js';
 
@@ -315,15 +315,18 @@ const inkCount = s => s.strokes.length + s.texts.length + s.symbols.length;
 const sketchKey = v => `s-${v.id}-${v.skizze.strokes.length}-${v.skizze.texts.length}-${v.skizze.symbols.length}-${v.skizze.rev || 0}`;
 
 /* Zeichnet Striche, Texte und Grenzzeichen (Koordinaten in PDF-Punkten, Ursprung links oben) */
+const dashOf = w => [Math.max(2.5, w * 4), Math.max(2, w * 3)];
 function paintInk(ctx, ink, pageNo, k) {
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   for (const s of ink.strokes.filter(s => s.page === pageNo)) {
     ctx.strokeStyle = s.color; ctx.fillStyle = s.color; ctx.lineWidth = s.width * k;
+    ctx.setLineDash(s.dash ? dashOf(s.width).map(x => x * k) : []);
     if (s.points.length === 1) { ctx.beginPath(); ctx.arc(s.points[0][0] * k, s.points[0][1] * k, s.width * k / 2, 0, Math.PI * 2); ctx.fill(); continue; }
     ctx.beginPath(); ctx.moveTo(s.points[0][0] * k, s.points[0][1] * k);
     for (let i = 1; i < s.points.length; i++) ctx.lineTo(s.points[i][0] * k, s.points[i][1] * k);
     ctx.stroke();
   }
+  ctx.setLineDash([]);
   for (const t of ink.texts.filter(t => t.page === pageNo)) {
     ctx.fillStyle = t.color; ctx.font = `bold ${t.size * k}px Helvetica, Arial, sans-serif`;
     ctx.fillText(t.text, t.x * k, t.y * k);
@@ -1288,7 +1291,8 @@ async function buildProtocol(v, opts = {}) {
       for (const s of v.skizze.strokes.filter(s => s.page === idx + 1)) {
         const c = hexRgb(s.color);
         if (s.points.length === 1) { const p0 = toPdf(...s.points[0]); p.drawCircle({ x: p0.x, y: p0.y, size: s.width / 2, color: c }); continue; }
-        for (let i = 1; i < s.points.length; i++) p.drawLine({ start: toPdf(...s.points[i - 1]), end: toPdf(...s.points[i]), thickness: s.width, color: c, lineCap: LineCapStyle.Round });
+        const d = s.points.map(([x, yy], i) => `${i ? 'L' : 'M'}${x.toFixed(2)} ${yy.toFixed(2)}`).join(' ');
+        p.drawSvgPath(d, { x: mb.x, y: mb.y + ph, borderColor: c, borderWidth: s.width, borderLineCap: LineCapStyle.Round, borderDashArray: s.dash ? dashOf(s.width) : undefined });
       }
       for (const t of v.skizze.texts.filter(t => t.page === idx + 1)) {
         const pos = toPdf(t.x, t.y);
@@ -1331,8 +1335,9 @@ let penSeen = false;
 try { penSeen = localStorage.getItem('gv-pen') === '1'; } catch (_) {}
 const Viewer = {
   st: null,
+  pref: { tool: 'pen', color: '#d0021b', weight: 'fein', dash: false },
   async open(opts) {
-    const st = this.st = { ...opts, doc: null, page: 1, pages: 1, zoom: 1, tx: 0, ty: 0, fit: 1, pw: 0, ph: 0, rs: 0, tool: 'pen', color: '#d0021b', pointers: new Map(), drawing: null, gesture: null, undo: [], renderTask: null };
+    const st = this.st = { ...opts, doc: null, page: 1, pages: 1, zoom: 1, tx: 0, ty: 0, fit: 1, pw: 0, ph: 0, rs: 0, tool: Viewer.pref.tool, color: Viewer.pref.color, weight: Viewer.pref.weight, dash: Viewer.pref.dash, pointers: new Map(), drawing: null, gesture: null, undo: [], redo: [], renderTask: null };
     $('#viewer').hidden = false;
     document.body.style.overflow = 'hidden';
     $('#v-title').textContent = opts.title;
@@ -1419,22 +1424,51 @@ const Viewer = {
     this.applyTransform(); this.scheduleRender();
   },
   zoomCenter(factor) { const r = $('#v-stage').getBoundingClientRect(); this.zoomAt(factor, r.width / 2, r.height / 2); },
-  snapshot() { const st = this.st; st.undo.push(JSON.stringify({ strokes: st.ink.strokes, texts: st.ink.texts, symbols: st.ink.symbols })); if (st.undo.length > 80) st.undo.shift(); $('#v-undo').disabled = false; },
+  state() { const st = this.st; return JSON.stringify({ strokes: st.ink.strokes, texts: st.ink.texts, symbols: st.ink.symbols }); },
+  restore(json) { const st = this.st, prev = JSON.parse(json); st.ink.strokes = prev.strokes; st.ink.texts = prev.texts; st.ink.symbols = prev.symbols || []; },
+  snapshot() { const st = this.st; st.undo.push(this.state()); if (st.undo.length > 80) st.undo.shift(); st.redo = []; this.syncHist(); },
+  syncHist() { const st = this.st; $('#v-undo').disabled = !st.undo.length; $('#v-redo').disabled = !st.redo.length; },
   changed() { this.st.onChange && this.st.onChange(); },
   /* Strichstärke passt sich dem Zoom an: gezoomt wird feiner gezeichnet */
-  lineWidth() { return Math.round(Math.min(2.2, Math.max(0.5, 2.2 / this.st.zoom)) * 100) / 100; },
+  lineWidth() { const b = this.st.weight === 'dick' ? 3.6 : 1.5; return Math.round(Math.min(b, Math.max(b / 4, b / this.st.zoom)) * 100) / 100; },
+  /* Linienenden auf der Seite, an denen eine neue Linie einrastet */
+  snap(p) {
+    const st = this.st, tol = 14 / st.zoom / st.fit;
+    let best = null, bd = tol;
+    for (const s of st.ink.strokes) {
+      if (s.page !== st.page || !s.points.length) continue;
+      for (const q of [s.points[0], s.points[s.points.length - 1]]) { const d = Math.hypot(q[0] - p[0], q[1] - p[1]); if (d < bd) { bd = d; best = q; } }
+    }
+    return best ? [best[0], best[1], true] : [p[0], p[1], false];
+  },
+  drawPreview() {
+    const st = this.st, s = st.drawing.s, end = st.drawing.end; if (!end) return;
+    this.drawInk();
+    const ctx = $('#v-ink').getContext('2d'), k = $('#v-ink').width / st.pw;
+    ctx.save(); ctx.lineCap = 'round'; ctx.strokeStyle = s.color; ctx.lineWidth = s.width * k;
+    ctx.setLineDash(s.dash ? dashOf(s.width).map(x => x * k) : []);
+    ctx.beginPath(); ctx.moveTo(s.points[0][0] * k, s.points[0][1] * k); ctx.lineTo(end[0] * k, end[1] * k); ctx.stroke();
+    ctx.setLineDash([]); ctx.lineWidth = Math.max(1.5, 2 * (window.devicePixelRatio || 1)); ctx.strokeStyle = s.color;
+    for (const q of [s.points[0], end]) if (q[2]) { ctx.beginPath(); ctx.arc(q[0] * k, q[1] * k, 9 * (window.devicePixelRatio || 1), 0, Math.PI * 2); ctx.stroke(); }
+    ctx.restore();
+  },
   startDraw(e) {
     const st = this.st, p = this.toPage(e);
     this.snapshot();
     st.drawing = { id: e.pointerId, t0: performance.now(), touch: e.pointerType === 'touch' };
     if (st.tool === 'erase') { st.drawing.erase = true; this.eraseAt(p); }
-    else st.drawing.s = { page: st.page, color: st.color, width: this.lineWidth(), points: [[Math.round(p[0] * 100) / 100, Math.round(p[1] * 100) / 100]] };
+    else {
+      const q = st.tool === 'line' ? this.snap(p) : p;
+      st.drawing.s = { page: st.page, color: st.color, width: this.lineWidth(), points: [[Math.round(q[0] * 100) / 100, Math.round(q[1] * 100) / 100]] };
+      if (st.dash) st.drawing.s.dash = true;
+      if (st.tool === 'line') { st.drawing.line = true; st.drawing.s.points[0][2] = q[2]; }
+    }
   },
   cancelDraw() {
     const st = this.st; if (!st.drawing) return;
-    const prev = JSON.parse(st.undo.pop() || 'null');
-    if (prev) { st.ink.strokes = prev.strokes; st.ink.texts = prev.texts; st.ink.symbols = prev.symbols || []; }
-    $('#v-undo').disabled = !st.undo.length;
+    const prev = st.undo.pop();
+    if (prev) this.restore(prev);
+    this.syncHist();
     st.drawing = null; this.drawInk();
   },
   down(e) {
@@ -1463,12 +1497,15 @@ const Viewer = {
       if (st.pointers.size > 1) return;
       const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
       if (st.drawing.erase) { for (const ev of evs) this.eraseAt(this.toPage(ev)); return; }
+      if (st.drawing.line) { st.drawing.end = this.snap(this.toPage(e)); st.drawing.moved = true; this.drawPreview(); return; }
       const s = st.drawing.s, ctx = $('#v-ink').getContext('2d'), k = $('#v-ink').width / st.pw;
       ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = s.color; ctx.lineWidth = s.width * k;
+      ctx.setLineDash(s.dash ? dashOf(s.width).map(x => x * k) : []); ctx.lineDashOffset = -(s.len || 0) * k;
       for (const ev of evs) {
         const p = this.toPage(ev), last = s.points[s.points.length - 1];
         if (Math.hypot(p[0] - last[0], p[1] - last[1]) < 0.4 / st.zoom) continue;
         ctx.beginPath(); ctx.moveTo(last[0] * k, last[1] * k); ctx.lineTo(p[0] * k, p[1] * k); ctx.stroke();
+        s.len = (s.len || 0) + Math.hypot(p[0] - last[0], p[1] - last[1]); ctx.lineDashOffset = -s.len * k;
         s.points.push([Math.round(p[0] * 100) / 100, Math.round(p[1] * 100) / 100]);
       }
       return;
@@ -1487,8 +1524,13 @@ const Viewer = {
     }
   },
   finishDraw() {
-    const st = this.st;
-    if (st.drawing.s) st.ink.strokes.push(st.drawing.s);
+    const st = this.st, d = st.drawing;
+    if (d.line) {
+      const a = d.s.points[0], b = d.end;
+      if (!b || Math.hypot(b[0] - a[0], b[1] - a[1]) < 1) { this.cancelDraw(); return; }
+      d.s.points = [[a[0], a[1]], [Math.round(b[0] * 100) / 100, Math.round(b[1] * 100) / 100]];
+    }
+    if (d.s) { delete d.s.len; st.ink.strokes.push(d.s); }
     st.drawing = null; this.drawInk(); this.changed();
   },
   up(e) {
@@ -1498,7 +1540,8 @@ const Viewer = {
   },
   eraseAt(p) {
     const st = this.st, tol = 8 / st.zoom / st.fit;
-    const near = pts => pts.some(q => Math.hypot(q[0] - p[0], q[1] - p[1]) < tol);
+    const dSeg = (a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1], l = dx * dx + dy * dy; const t = l ? Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / l)) : 0; return Math.hypot(a[0] + t * dx - p[0], a[1] + t * dy - p[1]); };
+    const near = pts => pts.length === 1 ? Math.hypot(pts[0][0] - p[0], pts[0][1] - p[1]) < tol : pts.some((q, i) => i > 0 && dSeg(pts[i - 1], q) < tol);
     const before = st.ink.strokes.length + st.ink.texts.length + st.ink.symbols.length;
     st.ink.strokes = st.ink.strokes.filter(s => s.page !== st.page || !near(s.points));
     st.ink.symbols = st.ink.symbols.filter(s => s.page !== st.page || Math.hypot(s.x - p[0], s.y - p[1]) > s.r + tol);
@@ -1507,16 +1550,23 @@ const Viewer = {
   },
   undoLast() {
     const st = this.st; if (!st || !st.undo.length) return;
-    const prev = JSON.parse(st.undo.pop());
-    st.ink.strokes = prev.strokes; st.ink.texts = prev.texts; st.ink.symbols = prev.symbols || [];
-    $('#v-undo').disabled = !st.undo.length;
-    this.drawInk(); this.changed();
+    st.redo.push(this.state()); this.restore(st.undo.pop());
+    this.syncHist(); this.drawInk(); this.changed();
+  },
+  redoLast() {
+    const st = this.st; if (!st || !st.redo.length) return;
+    st.undo.push(this.state()); this.restore(st.redo.pop());
+    this.syncHist(); this.drawInk(); this.changed();
   },
   syncTools() {
     const st = this.st;
     $$('#v-tools [data-tool]').forEach(b => { b.classList.toggle('on', b.dataset.tool === st.tool); b.setAttribute('aria-pressed', String(b.dataset.tool === st.tool)); });
     $$('#v-tools [data-color]').forEach(b => { b.classList.toggle('on', b.dataset.color === st.color); b.setAttribute('aria-pressed', String(b.dataset.color === st.color)); });
-    $('#v-undo').disabled = !st.undo.length;
+    $$('#v-tools [data-width]').forEach(b => { b.classList.toggle('on', b.dataset.width === st.weight); b.setAttribute('aria-pressed', String(b.dataset.width === st.weight)); });
+    $('#v-dash').classList.toggle('on', st.dash); $('#v-dash').setAttribute('aria-pressed', String(st.dash));
+    $('#v-tools').style.setProperty('--cur', st.color);
+    Viewer.pref = { tool: st.tool, color: st.color, weight: st.weight, dash: st.dash };
+    this.syncHist();
     $('#v-stage').style.cursor = st.editable ? 'crosshair' : 'grab';
   },
 };
@@ -1535,12 +1585,16 @@ function initViewer() {
   $('#v-next').onclick = () => Viewer.showPage(Viewer.st.page + 1);
   $('#v-undo').onclick = () => Viewer.undoLast();
   $$('#v-tools [data-tool]').forEach(b => b.onclick = () => { Viewer.st.tool = b.dataset.tool; Viewer.syncTools(); });
-  $$('#v-tools [data-color]').forEach(b => b.onclick = () => { Viewer.st.color = b.dataset.color; Viewer.st.tool = 'pen'; Viewer.syncTools(); });
+  $$('#v-tools [data-color]').forEach(b => b.onclick = () => { Viewer.st.color = b.dataset.color; if (Viewer.st.tool === 'erase') Viewer.st.tool = 'pen'; Viewer.syncTools(); });
+  $$('#v-tools [data-width]').forEach(b => b.onclick = () => { Viewer.st.weight = b.dataset.width; if (Viewer.st.tool === 'erase') Viewer.st.tool = 'pen'; Viewer.syncTools(); });
+  $('#v-dash').onclick = () => { Viewer.st.dash = !Viewer.st.dash; if (Viewer.st.tool === 'erase') Viewer.st.tool = 'pen'; Viewer.syncTools(); };
+  $('#v-redo').onclick = () => Viewer.redoLast();
   window.addEventListener('resize', () => { if (Viewer.st) Viewer.showPage(Viewer.st.page); });
   document.addEventListener('keydown', e => {
     if (!Viewer.st) return;
     if (e.key === 'Escape') Viewer.close();
-    if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); Viewer.undoLast(); }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? Viewer.redoLast() : Viewer.undoLast(); }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') { e.preventDefault(); Viewer.redoLast(); }
   });
 }
 
