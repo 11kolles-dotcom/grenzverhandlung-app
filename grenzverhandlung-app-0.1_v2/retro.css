@@ -204,3 +204,7 @@ body .drop.over { background: var(--p-sky); }
 .pill.invite { background: var(--p-butter); color: var(--ink); }
 .pill.invite::before { display: none; }
 .pill.invite svg { width: 14px; height: 14px; }
+
+/* Schritte vor der Eröffnung gesperrt */
+.step.gated { opacity: .5; }
+.step.gated .txt small::before { content: '🔒 '; }

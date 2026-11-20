@@ -5,7 +5,7 @@
  */
 'use strict';
 
-const APP_VERSION = '0.7.0';
+const APP_VERSION = '0.7.1';
 const EGIZ_URL = 'https://pdf.egiz.gv.at/';
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'libs/pdf.worker.min.js';
 
@@ -198,6 +198,9 @@ function migrate(v) {
 
 const app = { list: [], cur: null, view: 'start', editing: null, pending: null };
 const isLocked = () => !!(app.cur && app.cur.locked);
+/* Skizze, Grenzverlauf, Abschluss und Zustimmung erst nach der Eröffnung; Anwesenheit schon vorher */
+const isOpened = (v = app.cur) => !!(v && (v.meta.eroeffnung || v.locked));
+const GATED = ['skizze', 'beschreibung', 'abschluss', 'zustimmung'];
 const owners = v => v.beteiligte.filter(b => b.rolle === 'Eigentümer');
 
 let saveTimer;
@@ -420,7 +423,8 @@ function renderChrome() {
       h('div', { class: 'progress-label' }, h('span', {}, 'Fortschritt'), h('span', {}, `${pr.done} von ${pr.total}`)),
       h('div', { class: 'bar' }, h('span', { style: `width:${Math.round(pr.done / pr.total * 100)}%` }))),
     STEPS.map(st => h('button', {
-      type: 'button', class: 'step' + (st.k === app.view ? ' on' : '') + (stepDone(st.k) ? ' done' : ''),
+      type: 'button', class: 'step' + (st.k === app.view ? ' on' : '') + (stepDone(st.k) ? ' done' : '') + (GATED.includes(st.k) && !isOpened() ? ' gated' : ''),
+      title: GATED.includes(st.k) && !isOpened() ? 'Erst nach der Eröffnung' : null,
       'aria-current': st.k === app.view ? 'step' : null, onclick: () => setView(st.k),
     }, h('span', { class: 'ico' }, icon(st.k)), h('span', { class: 'tick' }, '✓'),
       h('span', { class: 'txt' }, h('b', {}, st.t), h('small', {}, st.s)))));
@@ -429,6 +433,7 @@ function renderChrome() {
   back.hidden = i <= 0; next.hidden = i >= STEPS.length - 1;
   if (i > 0) back.textContent = 'Zurück';
   if (i < STEPS.length - 1) next.textContent = `Weiter: ${STEPS[i + 1].t}`;
+  next.disabled = app.view === 'eroeffnung' && !isOpened();
   $('#actionbar-hint').textContent = i >= 0 ? `Schritt ${i + 1} von ${STEPS.length}` : '';
 }
 
@@ -440,9 +445,18 @@ function setView(view) {
   renderChrome();
   const page = h('div', { class: 'page' });
   main.append(page);
-  VIEWS[view](page);
+  if (GATED.includes(view) && app.cur && !isOpened()) gatePage(page, view);
+  else VIEWS[view](page);
   main.focus({ preventScroll: true });
   window.scrollTo(0, 0);
+}
+function gatePage(page, view) {
+  const st = STEPS.find(x => x.k === view);
+  put(page, pageHead(st ? st.t : 'Noch nicht eröffnet'),
+    h('div', { class: 'card stack gate' },
+      notice('brand', 'clock', h('strong', {}, 'Die Verhandlung ist noch nicht eröffnet.'),
+        h('span', {}, 'Skizze, Grenzverlauf und Abschluss sind erst nach der Eröffnung möglich. Wer schon da ist, kann vorher als anwesend angehakt werden.')),
+      h('div', {}, h('button', { class: 'btn primary', type: 'button', onclick: () => setView('eroeffnung') }, 'Zur Eröffnung'))));
 }
 function rerender() { const y = window.scrollY; setView(app.view); window.scrollTo(0, y); }
 
@@ -565,9 +579,10 @@ function behelfeVorhalten() {
     h('div', { class: 'card-head' },
       h('div', {}, h('h2', {}, 'Vorgehaltene GFN'), h('p', { class: 'muted' }, 'Anhaken, was den Eigentümern gezeigt wurde. Steht so im Protokoll.')),
       h('span', { class: 'pill ' + (n ? 'good' : '') }, `${n} von ${v.behelfe.length} vorgehalten`)),
+    !L && !isOpened() ? h('p', { class: 'muted', style: 'margin:0 0 8px;font-size:.88rem' }, 'Abhaken erst nach der Eröffnung. Ansehen geht schon vorher.') : null,
     v.behelfe.length ? h('ul', { class: 'gfn-list' }, v.behelfe.map(b => h('li', {},
       h('label', { class: 'check' },
-        h('input', { type: 'checkbox', checked: b.vorgehalten, disabled: L, onchange: e => {
+        h('input', { type: 'checkbox', checked: b.vorgehalten, disabled: L || !isOpened(), onchange: e => {
           b.vorgehalten = e.target.checked; logEvent(`Behelf ${b.gz} ${b.vorgehalten ? 'vorgehalten' : 'nicht vorgehalten'}`); touch(); rerender();
         } }),
         h('span', {}, h('strong', { class: 'mono' }, b.gz || 'ohne GZ'), h('span', { class: 'muted' }, ` · ${b.planverfasser || 'Planverfasser unbekannt'}${b.anmerkung ? ' · ' + b.anmerkung : ''}`))),
@@ -578,7 +593,7 @@ function behelfeVorhalten() {
       h('button', { class: 'btn small ghost', type: 'button', onclick: e => e.currentTarget.nextElementSibling.click() }, icon('plus'), 'GFN-Plan ergänzen (PDF)'),
       h('input', { type: 'file', accept: 'application/pdf', hidden: true, onchange: e => {
         const f = e.target.files[0]; if (!f) return;
-        v.behelfe.push({ id: uid(), planverfasser: '', gz: f.name.replace(/\.pdf$/i, ''), anmerkung: 'vor Ort ergänzt', vorgehalten: true, pdf: f });
+        v.behelfe.push({ id: uid(), planverfasser: '', gz: f.name.replace(/\.pdf$/i, ''), anmerkung: 'vor Ort ergänzt', vorgehalten: isOpened(), pdf: f });
         logEvent(`Behelf ${f.name} ergänzt`); touch(true); rerender();
       } })));
 }
@@ -616,7 +631,7 @@ VIEWS.eroeffnung = page => {
     behelfeVorhalten(),
     h('div', { class: 'page-head' },
       h('div', {}, h('h2', {}, 'Anwesende'),
-        h('p', { class: 'lead' }, 'Antippen, wer da ist, und wie die Identität festgestellt wurde: P persönlich bekannt, A allgemein bekannt, L Lichtbildausweis.')),
+        h('p', { class: 'lead' }, (isOpened() ? '' : 'Geht schon vor der Eröffnung. ') + 'Antippen, wer da ist, und wie die Identität festgestellt wurde: P persönlich bekannt, A allgemein bekannt, L Lichtbildausweis.')),
       h('button', { class: 'btn', type: 'button', disabled: L, onclick: () => {
         const b = newPerson({ rolle: 'Anwesend (sonstige)' }); b.anwesend = true; v.beteiligte.push(b); app.editing = b.id; touch(); rerender();
       } }, icon('plus'), 'Person')),
