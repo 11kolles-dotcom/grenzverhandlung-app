@@ -53,6 +53,7 @@ function drawBet() {
     sel.onchange = () => { p.rolle = sel.value; drawBet(); check(); };
     tdR.append(sel); tr.append(tdR);
     tr.append(cellInput(p, 'ez'), cellInput(p, 'gst'), cellInput(p, 'name', 'Vor- und Nachname'), cellInput(p, 'anschrift', 'Straße, PLZ Ort'));
+    const tdE = cellInput(p, 'einladung'); tdE.firstChild.type = 'time'; tr.append(tdE);
     const tv = p.rolle === 'Vertreter' ? cellInput(p, 'vertritt', 'wen?') : document.createElement('td');
     tr.append(tv, delCell(state.bet, p, drawBet));
     tb.append(tr);
@@ -89,6 +90,11 @@ function drawUnt() {
   }
 }
 $('#add-bet').onclick = () => { state.bet.push({ rolle: 'Eigentümer', ez: '', gst: '', name: '', anschrift: '', vertritt: '' }); drawBet(); check(); $('#bet tbody tr:last-child td:nth-child(2) input').focus(); };
+$('#inv-go').onclick = () => {
+  const t = $('#inv-all').value; if (!t) { toast('Bitte zuerst eine Uhrzeit wählen.'); return; }
+  let n = 0; for (const b of state.bet) if (!b.einladung) { b.einladung = t; n++; }
+  drawBet(); toast(`Einladung ${t} Uhr bei ${n} Person${n === 1 ? '' : 'en'} gesetzt`);
+};
 $('#paste-go').onclick = () => {
   state.bet = state.bet.filter(b => b.name.trim() || b.ez.trim() || b.gst.trim() || b.anschrift.trim());
   const lines = $('#paste').value.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
@@ -351,6 +357,7 @@ $('#save').onclick = async () => {
       if (b.ez.trim()) o.ez = b.ez.trim();
       if (b.gst.trim()) o.gst = b.gst.trim();
       if (b.rolle === 'Vertreter' && b.vertritt.trim()) o.vertritt = b.vertritt.trim();
+      if (b.einladung) o.einladung = b.einladung;
       return o;
     });
     zip.file('verhandlung.json', JSON.stringify(json, null, 2));

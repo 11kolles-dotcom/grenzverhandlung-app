@@ -198,3 +198,9 @@ body .drop { background: var(--p-sand); }
 body .drop.over { background: var(--p-sky); }
 .file-chip { background: var(--p-sage); color: var(--ink); }
 .start-card .foot { background: var(--p-sand); }
+
+/* Einladungszeit neben dem Namen */
+.name-row { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+.pill.invite { background: var(--p-butter); color: var(--ink); }
+.pill.invite::before { display: none; }
+.pill.invite svg { width: 14px; height: 14px; }

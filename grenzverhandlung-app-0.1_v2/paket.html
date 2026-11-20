@@ -31,7 +31,7 @@
   .pk-bar .muted { flex: 1; font-size: .88rem; }
   .pk-err { color: var(--crit); font-weight: 600; }
   .pk-scroll { overflow-x: auto; }
-  .pk-scroll .pk-table { min-width: 720px; }
+  .pk-scroll .pk-table { min-width: 840px; }
   textarea.paste { width: 100%; min-height: 90px; font: .88rem var(--mono); padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); }
 </style>
 </head>
@@ -59,9 +59,10 @@
     <div><h2>2 · Beteiligte</h2><p class="muted" style="margin:0">Eigentümer laut Grundbuch, bekannte Vertreter. Keine Telefonnummern oder E-Mail-Adressen (DSGVO).</p></div>
     <details><summary class="muted">Alternativ: Grundbuchsabfrage (CSV) einlesen</summary>
     <div class="drop" id="drop-gb" style="margin-top:8px"><strong>Grundbuchsabfrage hierher ziehen</strong> oder klicken<br><span style="font-size:.85rem">beide CSV-Dateien gemeinsam: Eigentümer und Grundstücke (Zuordnung über die EZ). Übernimmt alle Eigentümer der Abfrage, nicht betroffene danach entfernen.</span></div></details>
-    <div class="pk-scroll"><table class="pk-table" id="bet"><thead><tr><th style="width:150px">Rolle</th><th style="width:80px">EZ</th><th style="width:90px">Gst.-Nr.</th><th>Name</th><th>Anschrift</th><th>vertritt</th><th class="x"></th></tr></thead><tbody></tbody></table></div>
+    <div class="pk-scroll"><table class="pk-table" id="bet"><thead><tr><th style="width:150px">Rolle</th><th style="width:80px">EZ</th><th style="width:90px">Gst.-Nr.</th><th>Name</th><th>Anschrift</th><th style="width:110px">Einladung</th><th>vertritt</th><th class="x"></th></tr></thead><tbody></tbody></table></div>
     <div class="row">
       <button class="btn small" type="button" id="add-bet">+ Person</button>
+      <span class="row" style="gap:6px"><label class="lbl" for="inv-all">Einladung für alle ohne Zeit</label><input id="inv-all" type="time" style="width:150px"><button class="btn small ghost" type="button" id="inv-go">Setzen</button></span>
       <details style="flex:1"><summary class="muted">Aus Excel einfügen (Zeilen kopieren)</summary>
         <p class="muted" style="margin:6px 0">Spalten EZ, Gst.-Nr., Name, Anschrift kopieren (eine Person je Zeile) und hier einfügen.</p>
         <textarea class="paste" id="paste" placeholder="1012&#9;.626&#9;Johann Steiner&#9;Kapellenweg 7, 8101 Gratkorn"></textarea>

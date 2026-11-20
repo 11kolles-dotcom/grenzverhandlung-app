@@ -413,3 +413,7 @@ a.doc-open { text-decoration: none; }
 .confirm-box h2 { margin: 0; }
 .confirm-box p { margin: 0; }
 .confirm-box input { min-height: 48px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; font: 600 1.1rem var(--mono); background: var(--surface); color: var(--ink); }
+
+.name-row { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+.pill.invite::before { display: none; }
+.pill.invite svg { width: 14px; height: 14px; }

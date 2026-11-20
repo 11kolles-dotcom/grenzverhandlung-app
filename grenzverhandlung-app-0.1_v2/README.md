@@ -83,13 +83,13 @@ unterlagen/Einladung.pdf
     { "geschaeftszahl": "GFN 2775/2020/63", "anmerkung": "ohne PDF: steht trotzdem zur Auswahl" }
   ],
   "beteiligte": [
-    { "ez": "1012", "gst": ".626", "name": "Johann Steiner", "anschrift": "Kapellenweg 7, 8101 Gratkorn", "rolle": "Eigentümer" },
+    { "ez": "1012", "gst": ".626", "name": "Johann Steiner", "anschrift": "Kapellenweg 7, 8101 Gratkorn", "rolle": "Eigentümer", "einladung": "09:00" },
     { "name": "Ing. Peter Lang", "anschrift": "Gemeindeamt, 8101 Gratkorn", "rolle": "Vertreter", "vertritt": "Marktgemeinde Gratkorn" }
   ]
 }
 ```
 
-`rolle`: `Eigentümer`, `Vertreter` oder `Anwesend (sonstige)`. Keine Telefonnummern oder E-Mail-Adressen aufnehmen (DSGVO, Auskunft BEV). Ein Beispielpaket lässt sich in der App auf der Startseite herunterladen.
+`einladung`: Uhrzeit laut Einladung (optional, HH:MM). `rolle`: `Eigentümer`, `Vertreter` oder `Anwesend (sonstige)`. Keine Telefonnummern oder E-Mail-Adressen aufnehmen (DSGVO, Auskunft BEV). Ein Beispielpaket lässt sich in der App auf der Startseite herunterladen.
 
 ## Betrieb
 
