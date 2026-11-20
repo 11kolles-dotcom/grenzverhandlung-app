@@ -208,3 +208,9 @@ body .drop.over { background: var(--p-sky); }
 /* Schritte vor der Eröffnung gesperrt */
 .step.gated { opacity: .5; }
 .step.gated .txt small::before { content: '🔒 '; }
+
+/* Vertretung beim Eigentümer */
+.person .vertreter { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: flex-end; padding: 12px; border-radius: 10px; background: var(--surface-2); border: 1px dashed var(--line); }
+.person .vertreter .field { flex: 1 1 220px; margin: 0; }
+.invite-all { align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 14px; }
+.invite-all svg { width: 18px; height: 18px; }

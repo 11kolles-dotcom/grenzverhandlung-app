@@ -5,7 +5,7 @@
  */
 'use strict';
 
-const APP_VERSION = '0.7.2';
+const APP_VERSION = '0.8.0';
 const EGIZ_URL = 'https://pdf.egiz.gv.at/';
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'libs/pdf.worker.min.js';
 
@@ -160,7 +160,22 @@ function newPerson(b = {}) {
     rolle: b.rolle && ROLLEN.includes(b.rolle) ? b.rolle : 'Eigentümer', vertritt: b.vertritt || '',
     einladung: /^\d{1,2}:\d{2}$/.test(b.einladung || '') ? b.einladung.padStart(5, '0') : '',
     anwesend: false, idnachweis: '', vollmacht: '', anmerkung: '', zustimmung: { art: 'offen', zeit: null },
+    vertreten: false, vertreter: { name: '', idnachweis: '', vollmacht: '' },
   };
+}
+/* Anwesend ist, wer selbst da ist oder (als Eigentümer) vertreten wird */
+const isOwnerP = b => b.rolle === 'Eigentümer';
+const present = b => b.anwesend || (isOwnerP(b) && b.vertreten);
+/* Vertreter aus dem Paket beim vertretenen Eigentümer vormerken (Name vorausgefüllt), statt als eigene Karte */
+function attachVertreter(list) {
+  const ow = list.filter(isOwnerP);
+  return list.filter(x => {
+    if (x.rolle !== 'Vertreter' || !x.vertritt) return true;
+    const key = x.vertritt.toLowerCase().trim();
+    const hits = ow.filter(o => o.name.toLowerCase().includes(key));
+    hits.forEach(o => { o.vertreter.name = o.vertreter.name || x.name; });
+    return !hits.length;
+  });
 }
 const BESCHREIBUNG_FEST = 'Der Verlauf der Grenzen wird von den erschienenen beteiligten Eigentümern oder deren bevollmächtigten Vertretern entsprechend der untenstehenden Skizze festgelegt und im Sinne von §845 ABGB und der Vermessungsverordnung i.d.g.F. gekennzeichnet.\nDie Grenze verläuft von Grenzpunkt zu Grenzpunkt geradlinig, sofern nichts anderes angegeben ist. Die zeichnerische Darstellung erfolgt unter Verwendung des im Anhang zur Vermessungsverordnung i.d.g.F. festgelegten Zeichenschlüssels.\n\nWenn der Verlauf von Grenzabschnitten mangels Einigung der Eigentümer nicht festgelegt werden konnte, ist dies untenstehend beschrieben.';
 const BESCHREIBUNG_VORLAGE = BESCHREIBUNG_FEST + '\n\nAlte Grenzpunkte wurden aufgrund oben genannter GFN (VHW´s) überprüft bzw. rückgesetzt und einvernehmlich anerkannt.\n\nDie neuen Grenzpunkte wurden ebenfalls einvernehmlich festgelegt und in der Natur vermarkt.';
@@ -173,7 +188,7 @@ function newVerhandlung(src) {
       datum: src.datum || todayISO(), eroeffnung: '', schluss: '', leiter: src.verhandlungsleiter || 'DI Gerald Fuxjäger', kanzlei: src.kanzlei || '',
       gegenstand: src.gegenstand || '',
     },
-    beteiligte: (src.beteiligte || []).map(newPerson),
+    beteiligte: attachVertreter((src.beteiligte || []).map(newPerson)),
     behelfe: (src.behelfe || []).map(b => ({ id: uid(), planverfasser: b.planverfasser || '', gz: b.geschaeftszahl || '', anmerkung: b.anmerkung || '', vorgehalten: false, pdf: b.pdf, datei: b.datei || '' })),
     skizze: { pdf: src.skizzePdf || null, strokes: [], texts: [], symbols: [] },
     fotos: [],
@@ -188,7 +203,11 @@ function migrate(v) {
   v.skizze.symbols = v.skizze.symbols || [];
   delete v.vorab;
   v.unterlagen = v.unterlagen || [];
-  v.beteiligte.forEach(b => { if (b.einladung === undefined) b.einladung = ''; });
+  v.beteiligte.forEach(b => {
+    if (b.einladung === undefined) b.einladung = '';
+    if (b.vertreten === undefined) b.vertreten = false;
+    if (!b.vertreter) b.vertreter = { name: '', idnachweis: '', vollmacht: '' };
+  });
   v.fotos = v.fotos || [];
   v.meta.gemeinde = v.meta.gemeinde || '';
   if (!(v.beschreibung.text || '').includes('Der Verlauf der Grenzen wird')) v.beschreibung.text = BESCHREIBUNG_FEST + '\n\n' + (v.beschreibung.text || '').split(/\n+/).map(x => x.trim()).filter(Boolean).join('\n\n');
@@ -392,7 +411,7 @@ function field(label, value, oninput, { type = 'text', disabled = false, id, pla
 function stepDone(k, v = app.cur) {
   if (!v) return false;
   switch (k) {
-    case 'eroeffnung': return !!v.meta.eroeffnung && v.beteiligte.some(b => b.anwesend) && v.behelfe.some(b => b.vorgehalten);
+    case 'eroeffnung': return !!v.meta.eroeffnung && v.beteiligte.some(present) && v.behelfe.some(b => b.vorgehalten);
     case 'skizze': return inkCount(v.skizze) > 0;
     case 'beschreibung': return !!v.beschreibung.gesehen && !!(v.beschreibung.text || '').trim();
     case 'abschluss': return !!v.locked;
@@ -455,7 +474,7 @@ function gatePage(page, view) {
   put(page, pageHead(st ? st.t : 'Noch nicht eröffnet'),
     h('div', { class: 'card stack gate' },
       notice('brand', 'clock', h('strong', {}, 'Die Verhandlung ist noch nicht eröffnet.'),
-        h('span', {}, 'Skizze, Grenzverlauf und Abschluss sind erst nach der Eröffnung möglich. Wer schon da ist, kann vorher als anwesend angehakt werden.')),
+        h('span', {}, 'Skizze, Grenzverlauf und Abschluss sind erst nach der Eröffnung möglich. Wer schon da ist, kann vorher als anwesend oder vertreten angehakt werden.')),
       h('div', {}, h('button', { class: 'btn primary', type: 'button', onclick: () => setView('eroeffnung') }, 'Zur Eröffnung'))));
 }
 function rerender() { const y = window.scrollY; setView(app.view); window.scrollTo(0, y); }
@@ -535,23 +554,40 @@ function personCard(b) {
   const isOwner = b.rolle === 'Eigentümer';
   const z = ZUST[b.zustimmung.art];
   const editing = app.editing === b.id;
-  card = h('div', { class: 'card person' + (b.anwesend ? '' : ' absent') },
+  const setAnw = val => {
+    b.anwesend = val === 'da'; b.vertreten = val === 'vertreten';
+    if (b.vertreten && !b.vertreter.name) app.focusVertreter = b.id;
+    logEvent(`${b.name || 'Person'} ${b.anwesend ? 'anwesend' : b.vertreten ? 'vertreten' : 'nicht anwesend'}`); re();
+  };
+  const vName = h('input', { type: 'text', value: b.vertreter.name, disabled: L, placeholder: 'Vor- und Nachname', 'aria-label': `Vertreter für ${b.name}`,
+    oninput: e => { b.vertreter.name = e.target.value; touch(); }, onchange: () => logEvent(`${b.name}: vertreten durch ${b.vertreter.name}`) });
+  if (app.focusVertreter === b.id) { app.focusVertreter = null; requestAnimationFrame(() => vName.focus()); }
+  card = h('div', { class: 'card person' + (present(b) ? '' : ' absent') },
     h('div', { class: 'who' },
       h('div', { style: 'min-width:0;flex:1' },
         h('div', { class: 'name-row' }, h('span', { class: 'name' }, b.name || 'ohne Namen'),
           b.einladung ? h('span', { class: 'pill invite', title: 'Uhrzeit laut Einladung' }, icon('clock'), `eingeladen ${b.einladung} Uhr`) : null),
         h('div', { class: 'sub' }, [b.rolle === 'Vertreter' && b.vertritt ? `Vertreter für ${b.vertritt}` : b.rolle,
+          isOwner && b.vertreten && b.vertreter.name ? `vertreten durch ${b.vertreter.name}` : null,
           b.ez && `EZ ${b.ez}`, b.gst && `Gst. ${b.gst}`].filter(Boolean).join(' · ')),
         h('div', { class: 'sub' }, b.anschrift)),
       isOwner && b.zustimmung.art !== 'offen' ? h('span', { class: 'pill ' + z.cls }, z.label) : null),
     h('div', { class: 'controls' },
-      sw('anwesend', b.anwesend, val => { b.anwesend = val; logEvent(`${b.name || 'Person'} ${val ? 'anwesend' : 'nicht anwesend'}`); re(); }, L),
-      h('span', { class: 'row', style: 'gap:6px' }, h('span', { class: 'lbl' }, 'Identität'),
+      isOwner
+        ? seg([['da', 'anwesend', 'Eigentümer ist selbst da'], ['vertreten', 'vertreten', 'Eigentümer wird vertreten']], b.anwesend ? 'da' : b.vertreten ? 'vertreten' : '', setAnw, L, 'Anwesenheit')
+        : sw('anwesend', b.anwesend, val => { b.anwesend = val; logEvent(`${b.name || 'Person'} ${val ? 'anwesend' : 'nicht anwesend'}`); re(); }, L),
+      isOwner && b.vertreten ? null : h('span', { class: 'row', style: 'gap:6px' }, h('span', { class: 'lbl' }, 'Identität'),
         seg(IDNACHWEIS, b.idnachweis, val => { b.idnachweis = val; re(); }, L || !b.anwesend, 'Identitätsnachweis')),
       b.rolle === 'Vertreter' ? h('span', { class: 'row', style: 'gap:6px' }, h('span', { class: 'lbl' }, 'Vollmacht'),
         seg(VOLLMACHT, b.vollmacht, val => { b.vollmacht = val; re(); }, L, 'Vollmacht')) : null,
       h('span', { style: 'flex:1' }),
       h('button', { class: 'btn small ghost', type: 'button', disabled: L, 'aria-expanded': String(editing), onclick: () => { app.editing = editing ? null : b.id; re(); } }, icon('pen'), editing ? 'Fertig' : 'Bearbeiten')),
+    isOwner && b.vertreten ? h('div', { class: 'vertreter' },
+      h('div', { class: 'field' }, h('label', {}, 'Vertreten durch'), vName),
+      h('div', { class: 'row', style: 'gap:6px' }, h('span', { class: 'lbl' }, 'Identität'),
+        seg(IDNACHWEIS, b.vertreter.idnachweis, val => { b.vertreter.idnachweis = val; re(); }, L, 'Identitätsnachweis des Vertreters')),
+      h('div', { class: 'row', style: 'gap:6px' }, h('span', { class: 'lbl' }, 'Vollmacht'),
+        seg(VOLLMACHT, b.vertreter.vollmacht, val => { b.vertreter.vollmacht = val; re(); }, L, 'Art der Vollmacht'))) : null,
     editing ? h('div', { class: 'stack' },
       h('div', { class: 'edit' },
         field('Name', b.name, val => { b.name = val; touch(); }),
@@ -559,7 +595,7 @@ function personCard(b) {
         field('EZ', b.ez, val => { b.ez = val; touch(); }),
         field('Gst.Nr.', b.gst, val => { b.gst = val; touch(); }),
         field('Eingeladen um', b.einladung || '', val => { b.einladung = val; touch(); }, { type: 'time' }),
-        h('div', { class: 'field' }, h('label', {}, 'Rolle'),
+        isOwner && !b.lokal ? null : h('div', { class: 'field' }, h('label', {}, 'Rolle'),
           h('select', { onchange: e => { b.rolle = e.target.value; re(); } }, ROLLEN.map(r => h('option', { value: r, selected: r === b.rolle ? 'selected' : null }, r)))),
         b.rolle === 'Vertreter'
           ? field('vertritt', b.vertritt, val => { b.vertritt = val; touch(); })
@@ -600,7 +636,7 @@ function behelfeVorhalten() {
 VIEWS.eroeffnung = page => {
   const v = app.cur, L = isLocked();
   const m = v.meta;
-  const anw = v.beteiligte.filter(b => b.anwesend).length;
+  const anw = v.beteiligte.filter(present).length;
   const open = () => {
     m.eroeffnung = nowTime();
     if (v.status === 'vorbereitet') v.status = 'laufend';
@@ -631,12 +667,27 @@ VIEWS.eroeffnung = page => {
     behelfeVorhalten(),
     h('div', { class: 'page-head' },
       h('div', {}, h('h2', {}, 'Anwesende'),
-        h('p', { class: 'lead' }, (isOpened() ? '' : 'Geht schon vor der Eröffnung. ') + 'Antippen, wer da ist, und wie die Identität festgestellt wurde: P persönlich bekannt, A allgemein bekannt, L Lichtbildausweis.')),
+        h('p', { class: 'lead' }, (isOpened() ? '' : 'Geht schon vor der Eröffnung. ') + 'Bei jedem Eigentümer „anwesend“ oder „vertreten“ antippen und die Identität wählen: P persönlich bekannt, A allgemein bekannt, L Lichtbildausweis.')),
       h('button', { class: 'btn', type: 'button', disabled: L, onclick: () => {
-        const b = newPerson({ rolle: 'Anwesend (sonstige)' }); b.anwesend = true; v.beteiligte.push(b); app.editing = b.id; touch(); rerender();
+        const b = newPerson({ rolle: 'Anwesend (sonstige)' }); b.anwesend = true; b.lokal = true; v.beteiligte.push(b); app.editing = b.id; touch(); rerender();
       } }, icon('plus'), 'Person')),
+    einladungFehlt(),
     h('div', { class: 'grid2' }, v.beteiligte.map(personCard)));
 };
+
+/* Personen ohne Einladungszeit: eine Zeit für alle setzen (z. B. wenn das Paket keine Zeiten enthielt) */
+function einladungFehlt() {
+  const v = app.cur, ohne = v.beteiligte.filter(b => !b.einladung && b.rolle !== 'Anwesend (sonstige)');
+  if (isLocked() || !ohne.length) return null;
+  const t = h('input', { type: 'time', 'aria-label': 'Uhrzeit laut Einladung', style: 'width:130px' });
+  return h('div', { class: 'card flat row invite-all' },
+    icon('clock'), h('span', {}, `${ohne.length === v.beteiligte.length ? 'Keine Einladungszeiten im Paket.' : `${ohne.length} ohne Einladungszeit.`} Uhrzeit laut Einladung:`), t,
+    h('button', { class: 'btn small', type: 'button', onclick: () => {
+      if (!t.value) { toast('Bitte zuerst eine Uhrzeit wählen.'); return; }
+      ohne.forEach(b => { b.einladung = t.value; }); touch(); rerender(); toast(`Einladung ${t.value} Uhr bei ${ohne.length} Person${ohne.length === 1 ? '' : 'en'} eingetragen`);
+    } }, 'Für alle ohne Zeit setzen'),
+    h('span', { class: 'muted', style: 'font-size:.85rem' }, 'Einzelne Zeiten unter „Bearbeiten“.'));
+}
 
 /* ---------- Unterlagen (Angebot, Einladungen …) ---------- */
 function openDocs() {
@@ -805,12 +856,13 @@ VIEWS.beschreibung = page => {
 
 /* ---------- 5 Prüfen und sperren ---------- */
 function pflichtpruefung(v) {
-  const anw = v.beteiligte.filter(b => b.anwesend);
+  const anw = v.beteiligte.filter(b => b.anwesend), vtr = owners(v).filter(b => b.vertreten && !b.anwesend);
   return [
     ['Kopfdaten vollständig (Vermessungsamt, KG, Ort, Datum)', !!(v.meta.vermessungsamt && v.meta.kg && v.meta.ort && v.meta.datum), 'eroeffnung'],
     ['Eröffnungszeit erfasst', !!v.meta.eroeffnung, 'eroeffnung'],
     ['Verhandlungsleiter eingetragen', !!v.meta.leiter, 'eroeffnung'],
-    ['Mindestens eine anwesende Person', anw.length > 0, 'eroeffnung'],
+    ['Mindestens eine anwesende oder vertretene Person', anw.length > 0 || vtr.length > 0, 'eroeffnung'],
+    ['Name, Identität und Vollmacht bei allen Vertretern', vtr.every(b => b.vertreter.name.trim() && b.vertreter.idnachweis && b.vertreter.vollmacht), 'eroeffnung'],
     ['Identitätsnachweis bei allen Anwesenden', anw.length > 0 && anw.every(b => b.idnachweis), 'eroeffnung'],
     ['Vollmacht bei allen anwesenden Vertretern', anw.filter(b => b.rolle === 'Vertreter').every(b => b.vollmacht), 'eroeffnung'],
     ['Eigentümer im Verzeichnis', owners(v).length > 0, 'eroeffnung'],
@@ -1037,7 +1089,7 @@ VIEWS.zustimmung = page => {
         h('div', { class: 'who', style: 'display:flex;gap:14px;align-items:center;min-width:0' },
           h('div', { class: 'stack', style: 'gap:2px;min-width:0' },
             h('strong', {}, b.name || 'ohne Namen'),
-            h('span', { class: 'muted' }, `EZ ${b.ez || '–'} · Gst. ${b.gst || '–'} · ${b.anwesend ? 'anwesend' : 'nicht anwesend'}`),
+            h('span', { class: 'muted' }, `EZ ${b.ez || '–'} · Gst. ${b.gst || '–'} · ${b.anwesend ? 'anwesend' : b.vertreten ? `vertreten durch ${b.vertreter.name || '…'}` : 'nicht anwesend'}`),
             h('span', {}, h('span', { class: 'pill ' + z.cls }, z.label), b.zustimmung.zeit ? h('span', { class: 'muted' }, '  ' + timeOf(b.zustimmung.zeit) + ' Uhr') : null),
             sigImg)),
         h('div', { class: 'actions' },
@@ -1273,10 +1325,11 @@ async function buildProtocol(v, opts = {}) {
     return { qes: 'QES (ID Austria)', papier: 'Unterschrift auf Papier', verweigert: 'verweigert', offen: '' }[z] || '';
   };
   // Vertreter und Vollmacht beim vertretenen Eigentümer vermerken (die Tabelle der Anwesenden entfällt laut Vorlage)
-  const vertreterVon = b => v.beteiligte.filter(x => x.rolle === 'Vertreter' && x.anwesend && x.vertritt && b.name.toLowerCase().includes(x.vertritt.toLowerCase()))
-    .map(x => `vertreten durch ${x.name}${x.idnachweis ? ` (ID: ${x.idnachweis})` : ''}${x.vollmacht ? `, ${x.vollmacht}` : ''}`).join('; ');
+  const vtext = x => `vertreten durch ${x.name}${x.idnachweis ? ` (ID: ${x.idnachweis})` : ''}${x.vollmacht ? `, ${x.vollmacht}` : ''}`;
+  const vertreterVon = b => [b.vertreten && !b.anwesend && b.vertreter.name.trim() ? vtext(b.vertreter) : '',
+    ...v.beteiligte.filter(x => x.rolle === 'Vertreter' && x.anwesend && x.vertritt && b.name.toLowerCase().includes(x.vertritt.toLowerCase())).map(vtext)].filter(Boolean).join('; ');
   const rows = ow.map(b => [b.ez, b.gst.split(/,\s*/).join('\n'), `${b.name}\n${b.anschrift.split(/,\s*/).join('\n')}`, cellSig(b),
-    [b.idnachweis && `ID: ${b.idnachweis}`, b.anwesend ? '' : 'nicht anwesend', vertreterVon(b), opts.unterschriften && b.zustimmung.art === 'stift' ? 'Stift, nur Information' : '', b.anmerkung].filter(Boolean).join(', ')]);
+    [b.anwesend && b.idnachweis && `ID: ${b.idnachweis}`, present(b) ? '' : 'nicht anwesend', vertreterVon(b), opts.unterschriften && b.zustimmung.art === 'stift' ? 'Stift, nur Information' : '', b.anmerkung].filter(Boolean).join(', ')]);
   if (!rows.length) rows.push(['', '', '', '', '']);
   table([{ t: 'EZ', w: 0.095 }, { t: 'Gst.Nr.', w: 0.152 }, { t: 'Name und Anschrift\ndes Eigentümers', w: 0.303 }, { t: 'Unterschrift', w: 0.284 }, { t: 'Anmerkung', w: 0.166 }],
     rows, { size: 8.5, minRow: 46, headH: 36, headSize: 8.5, gapHead: 3, x0: M + 5, x1: W - M + 8 });
