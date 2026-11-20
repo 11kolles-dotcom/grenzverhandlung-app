@@ -5,7 +5,7 @@
  */
 'use strict';
 
-const APP_VERSION = '0.7.1';
+const APP_VERSION = '0.7.2';
 const EGIZ_URL = 'https://pdf.egiz.gv.at/';
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'libs/pdf.worker.min.js';
 
@@ -1639,7 +1639,12 @@ function init() {
     const f = e.target.files[0]; e.target.value = ''; if (!f) return;
     try { await acceptSignedPdf(f); } catch (err) { toast(err.message); }
   };
-  if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+    // Neue Version: sobald der neue Service Worker übernimmt, einmal neu laden (Daten liegen in IndexedDB)
+    const hadController = !!navigator.serviceWorker.controller; let reloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController && !reloaded) { reloaded = true; location.reload(); } });
+    navigator.serviceWorker.register('sw.js').then(r => r.update()).catch(() => {});
+  }
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
   setView('start');
 }
