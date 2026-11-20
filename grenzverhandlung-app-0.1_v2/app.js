@@ -5,7 +5,7 @@
  */
 'use strict';
 
-const APP_VERSION = '0.8.0';
+const APP_VERSION = '0.8.1';
 const EGIZ_URL = 'https://pdf.egiz.gv.at/';
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'libs/pdf.worker.min.js';
 
@@ -257,7 +257,47 @@ async function importZip(file) {
   const extra = zip.file(/(^|\/)unterlagen\/[^/]+\.pdf$/i).filter(f => !listed.has(f.name.slice(base.length)) && !listed.has(f.name))
     .sort((a, b) => a.name.localeCompare(b.name, 'de'));
   for (const f of extra) src.unterlagen.push({ titel: titleFromFile(f.name), datei: f.name.slice(base.length), pdf: new Blob([await f.async('uint8array')], { type: 'application/pdf' }) });
-  return newVerhandlung(src);
+  const v = newVerhandlung(src);
+  try { const n = await einladungenLesen(v); if (n) v.log.push({ zeit: Date.now(), text: `Einladungszeiten aus der Einladung gelesen (${n} Person${n === 1 ? '' : 'en'})` }); } catch (e) { /* Auslesen ist optional */ }
+  return v;
+}
+
+/* Einladungszeiten aus den Einladungs-PDFs der Unterlagen lesen.
+   Je Seite (bzw. je Brief) wird die Uhrzeit gesucht („09:00 Uhr“, „9.30 Uhr“, „um 9 Uhr“) und den Eigentümern zugeordnet,
+   deren Name auf der Seite steht; bevorzugt der Empfänger im Adressfeld (oberes Drittel). Vorhandene Zeiten bleiben. */
+const nameTokens = n => String(n || '').replace(/\(.*?\)/g, ' ').toLowerCase().split(/[^a-zäöüß]+/i)
+  .filter(t => t.length >= 3 && !/^(ing|mag|dipl|herr|herrn|frau|und|der|die|das|von|bsc|msc|mba|phd|prof)$/.test(t));
+function zeitAusText(t) {
+  t = t.replace(/\s+/g, ' ');
+  const m = t.match(/(?:\bum\s+|,\s*|\b)([01]?\d|2[0-3])[:.]([0-5]\d)\s*(?:Uhr|h\b)/i) || t.match(/\bum\s+([01]?\d|2[0-3])\s*Uhr/i);
+  return m ? `${m[1].padStart(2, '0')}:${m[2] || '00'}` : '';
+}
+async function einladungenLesen(v, { ueberschreiben = false } = {}) {
+  const docs = v.unterlagen.filter(u => /einladung/i.test(`${u.titel} ${u.datei}`) && u.pdf);
+  const ow = v.beteiligte.filter(b => b.rolle !== 'Anwesend (sonstige)' && (ueberschreiben || !b.einladung));
+  if (!docs.length || !ow.length) return 0;
+  const found = new Map();
+  for (const u of docs) {
+    const doc = await loadPdf(u.pdf);
+    let allgemein = '';
+    for (let i = 1; i <= doc.numPages; i++) {
+      const page = await doc.getPage(i), H = page.getViewport({ scale: 1 }).height;
+      const items = (await page.getTextContent()).items.filter(x => x.str.trim());
+      const text = items.map(x => x.str).join(' ');
+      const zeit = zeitAusText(text); if (!zeit) continue;
+      allgemein = allgemein || zeit;
+      const low = text.toLowerCase(), top = items.filter(x => x.transform[5] > H * 0.62).map(x => x.str).join(' ').toLowerCase();
+      const has = (b, t) => { const k = nameTokens(b.name); return k.length && k.every(x => t.includes(x)); };
+      let hits = ow.filter(b => has(b, top));
+      if (!hits.length) hits = ow.filter(b => has(b, low));
+      for (const b of hits) if (!found.has(b.id)) found.set(b.id, zeit);
+    }
+    // Eine gemeinsame Einladung ohne Namen: dieselbe Zeit für alle
+    if (!found.size && allgemein && doc.numPages <= 2) ow.forEach(b => found.set(b.id, allgemein));
+    doc.destroy();
+  }
+  for (const b of ow) if (found.has(b.id)) b.einladung = found.get(b.id);
+  return found.size;
 }
 
 /* ---------- Demo (Plan der Kanzlei, Personen fiktiv) ---------- */
@@ -276,14 +316,14 @@ function demoSource() {
       { planverfasser: 'Archiv (Planverfasser lt. Plankopf)', geschaeftszahl: 'GFN 1958', anmerkung: 'Plan aus 1958, Grundlage für die Wiederherstellung', datei: 'behelfe/GFN_1958.pdf' },
     ],
     beteiligte: [
-      { ez: '1012', gst: '.626', name: 'Johann Steiner', einladung: '09:00', anschrift: 'Kapellenweg 7, 8101 Gratkorn', rolle: 'Eigentümer' },
-      { ez: '1012', gst: '.626', name: 'Maria Steiner', einladung: '09:00', anschrift: 'Kapellenweg 7, 8101 Gratkorn', rolle: 'Eigentümer' },
-      { ez: '988', gst: '.627', name: 'Elisabeth Pichler', einladung: '09:00', anschrift: 'Kapellenweg 9, 8101 Gratkorn', rolle: 'Eigentümer' },
-      { ez: '540', gst: '784/5', name: 'Franz Hofer', einladung: '09:30', anschrift: 'Dorfstraße 12, 8101 Gratkorn', rolle: 'Eigentümer' },
-      { ez: '536', gst: '783/15', name: 'Christine Weber', einladung: '09:30', anschrift: 'Kapellenweg 3, 8101 Gratkorn', rolle: 'Eigentümer' },
-      { ez: '975', gst: '.625', name: 'Karl Wolf', einladung: '10:00', anschrift: 'Kapellenweg 5, 8101 Gratkorn', rolle: 'Eigentümer' },
-      { ez: '50000', gst: '823', name: 'Marktgemeinde Gratkorn (öffentliches Gut)', einladung: '10:00', anschrift: 'Gemeindeamt, 8101 Gratkorn', rolle: 'Eigentümer' },
-      { name: 'Ing. Peter Lang', einladung: '10:00', anschrift: 'Gemeindeamt, 8101 Gratkorn', rolle: 'Vertreter', vertritt: 'Marktgemeinde Gratkorn' },
+      { ez: '1012', gst: '.626', name: 'Johann Steiner', anschrift: 'Kapellenweg 7, 8101 Gratkorn', rolle: 'Eigentümer' },
+      { ez: '1012', gst: '.626', name: 'Maria Steiner', anschrift: 'Kapellenweg 7, 8101 Gratkorn', rolle: 'Eigentümer' },
+      { ez: '988', gst: '.627', name: 'Elisabeth Pichler', anschrift: 'Kapellenweg 9, 8101 Gratkorn', rolle: 'Eigentümer' },
+      { ez: '540', gst: '784/5', name: 'Franz Hofer', anschrift: 'Dorfstraße 12, 8101 Gratkorn', rolle: 'Eigentümer' },
+      { ez: '536', gst: '783/15', name: 'Christine Weber', anschrift: 'Kapellenweg 3, 8101 Gratkorn', rolle: 'Eigentümer' },
+      { ez: '975', gst: '.625', name: 'Karl Wolf', anschrift: 'Kapellenweg 5, 8101 Gratkorn', rolle: 'Eigentümer' },
+      { ez: '50000', gst: '823', name: 'Marktgemeinde Gratkorn (öffentliches Gut)', anschrift: 'Gemeindeamt, 8101 Gratkorn', rolle: 'Eigentümer' },
+      { name: 'Ing. Peter Lang', anschrift: 'Gemeindeamt, 8101 Gratkorn', rolle: 'Vertreter', vertritt: 'Marktgemeinde Gratkorn' },
     ],
   };
 }
@@ -300,6 +340,7 @@ async function createDemo() {
   const src = demoSource();
   src.skizzePdf = f.skizze; src.behelfe[0].pdf = f.gfn; src.unterlagen[0].pdf = f.einladung; src.unterlagen[1].pdf = f.angebot;
   const v = newVerhandlung(src);
+  await einladungenLesen(v).catch(() => 0);
   v.log[0].text = 'Demo-Verhandlung angelegt (Plan der Kanzlei, Personen fiktiv)';
   await DB.put(v);
   return v;
@@ -686,6 +727,12 @@ function einladungFehlt() {
       if (!t.value) { toast('Bitte zuerst eine Uhrzeit wählen.'); return; }
       ohne.forEach(b => { b.einladung = t.value; }); touch(); rerender(); toast(`Einladung ${t.value} Uhr bei ${ohne.length} Person${ohne.length === 1 ? '' : 'en'} eingetragen`);
     } }, 'Für alle ohne Zeit setzen'),
+    v.unterlagen.some(u => /einladung/i.test(`${u.titel} ${u.datei}`)) ? h('button', { class: 'btn small ghost', type: 'button', onclick: async e => {
+      e.currentTarget.disabled = true;
+      const n = await einladungenLesen(v).catch(() => 0);
+      if (n) { logEvent(`Einladungszeiten aus der Einladung gelesen (${n})`); touch(true); rerender(); toast(`${n} Einladungszeit${n === 1 ? '' : 'en'} aus der Einladung übernommen`); }
+      else { toast('In der Einladung wurde keine passende Uhrzeit gefunden (gescannt oder Namen anders geschrieben?).'); e.target.disabled = false; }
+    } }, icon('pdf'), 'Aus der Einladung lesen') : null,
     h('span', { class: 'muted', style: 'font-size:.85rem' }, 'Einzelne Zeiten unter „Bearbeiten“.'));
 }
 
