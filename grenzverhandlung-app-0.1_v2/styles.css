@@ -362,3 +362,25 @@ button.sketch-preview { position: relative; width: 100%; padding: 0; font: inher
   .opener .gzbig { font-size: 1.6rem; }
   .opener-action, .opener-action .btn { width: 100%; }
 }
+
+/* ---------- 0.5 Unterlagen ---------- */
+.docs-btn { gap: 8px; }
+.docs-count { min-width: 22px; height: 22px; padding: 0 6px; border-radius: 99px; background: var(--brand); color: var(--brand-ink); font-size: .75rem; font-weight: 700; display: inline-grid; place-items: center; }
+.docs-count[hidden] { display: none; }
+.docs-sheet { position: fixed; inset: 0; z-index: 45; display: flex; justify-content: flex-end; }
+.docs-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.35); }
+.docs-panel { position: relative; width: min(440px, 100%); height: 100%; background: var(--surface); box-shadow: -8px 0 30px rgba(0,0,0,.2); display: flex; flex-direction: column;
+  padding: calc(env(safe-area-inset-top, 0px) + 16px) 16px calc(env(safe-area-inset-bottom, 0px) + 16px); gap: 12px; animation: docs-in .18s ease-out; }
+@keyframes docs-in { from { transform: translateX(40px); opacity: 0; } }
+.docs-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.docs-head h2 { margin: 0; }
+.docs-head p { margin: 2px 0 0; font-size: .85rem; }
+.docs-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+.doc-row { display: flex; gap: 8px; align-items: center; }
+.doc-open { flex: 1; min-width: 0; display: flex; gap: 12px; align-items: center; text-align: left; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2); color: inherit; font: inherit; cursor: pointer; min-height: 60px; }
+.doc-open:hover { border-color: var(--brand); }
+.doc-ico { flex: none; width: 40px; height: 40px; border-radius: 10px; background: var(--brand-soft); color: var(--brand); display: grid; place-items: center; }
+.doc-txt { display: flex; flex-direction: column; min-width: 0; }
+.doc-txt b, .doc-txt small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.docs-foot { border-top: 1px solid var(--line); padding-top: 12px; }
+@media (max-width: 560px) { .docs-label { display: none; } .docs-btn { padding-inline: 10px; } }
