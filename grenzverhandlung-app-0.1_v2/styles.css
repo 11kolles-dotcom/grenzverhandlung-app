@@ -440,3 +440,7 @@ a.doc-open { text-decoration: none; }
   .seg.big .swatch::after { inset: 10px; }
   .v-hist { margin-left: 0; }
 }
+
+/* Schritte vor der Eröffnung gesperrt */
+.step.gated { opacity: .5; }
+.step.gated .txt small::before { content: '🔒 '; }
