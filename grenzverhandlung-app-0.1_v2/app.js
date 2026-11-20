@@ -5,7 +5,7 @@
  */
 'use strict';
 
-const APP_VERSION = '0.8.0';
+const APP_VERSION = '0.8.2';
 const EGIZ_URL = 'https://pdf.egiz.gv.at/';
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'libs/pdf.worker.min.js';
 
@@ -160,7 +160,7 @@ function newPerson(b = {}) {
     rolle: b.rolle && ROLLEN.includes(b.rolle) ? b.rolle : 'Eigentümer', vertritt: b.vertritt || '',
     einladung: /^\d{1,2}:\d{2}$/.test(b.einladung || '') ? b.einladung.padStart(5, '0') : '',
     anwesend: false, idnachweis: '', vollmacht: '', anmerkung: '', zustimmung: { art: 'offen', zeit: null },
-    vertreten: false, vertreter: { name: '', idnachweis: '', vollmacht: '' },
+    vertreten: false, abwesend: false, vertreter: { name: '', idnachweis: '', vollmacht: '' },
   };
 }
 /* Anwesend ist, wer selbst da ist oder (als Eigentümer) vertreten wird */
@@ -206,6 +206,7 @@ function migrate(v) {
   v.beteiligte.forEach(b => {
     if (b.einladung === undefined) b.einladung = '';
     if (b.vertreten === undefined) b.vertreten = false;
+    if (b.abwesend === undefined) b.abwesend = false;
     if (!b.vertreter) b.vertreter = { name: '', idnachweis: '', vollmacht: '' };
   });
   v.fotos = v.fotos || [];
@@ -257,7 +258,53 @@ async function importZip(file) {
   const extra = zip.file(/(^|\/)unterlagen\/[^/]+\.pdf$/i).filter(f => !listed.has(f.name.slice(base.length)) && !listed.has(f.name))
     .sort((a, b) => a.name.localeCompare(b.name, 'de'));
   for (const f of extra) src.unterlagen.push({ titel: titleFromFile(f.name), datei: f.name.slice(base.length), pdf: new Blob([await f.async('uint8array')], { type: 'application/pdf' }) });
-  return newVerhandlung(src);
+  const v = newVerhandlung(src);
+  try { const n = await einladungenLesen(v); if (n) v.log.push({ zeit: Date.now(), text: `Einladungszeiten aus der Einladung gelesen (${n} Person${n === 1 ? '' : 'en'})` }); } catch (e) { /* Auslesen ist optional */ }
+  return v;
+}
+
+/* Einladungszeiten aus den Einladungs-PDFs der Unterlagen lesen.
+   Je Seite (bzw. je Brief) wird die Uhrzeit gesucht („09:00 Uhr“, „9.30 Uhr“, „um 9 Uhr“) und den Eigentümern zugeordnet,
+   deren Name auf der Seite steht; bevorzugt der Empfänger im Adressfeld (oberes Drittel). Vorhandene Zeiten bleiben. */
+const nameTokens = n => String(n || '').replace(/\(.*?\)/g, ' ').toLowerCase().split(/[^a-zäöüß]+/i)
+  .filter(t => t.length >= 3 && !/^(ing|mag|dipl|herr|herrn|frau|und|der|die|das|von|bsc|msc|mba|phd|prof)$/.test(t));
+function zeitAusText(t) {
+  t = t.replace(/\s+/g, ' ');
+  const m = t.match(/(?:\bum\s+|,\s*|\b)([01]?\d|2[0-3])[:.]([0-5]\d)\s*(?:Uhr|h\b)/i) || t.match(/\bum\s+([01]?\d|2[0-3])\s*Uhr/i);
+  return m ? `${m[1].padStart(2, '0')}:${m[2] || '00'}` : '';
+}
+async function einladungenLesen(v, { ueberschreiben = false } = {}) {
+  const docs = v.unterlagen.filter(u => /ladung/i.test(`${u.titel} ${u.datei}`) && u.pdf);
+  const ow = v.beteiligte.filter(b => b.rolle !== 'Anwesend (sonstige)' && (ueberschreiben || !b.einladung));
+  if (!docs.length || !ow.length) return 0;
+  const found = new Map();
+  for (const u of docs) {
+    const doc = await loadPdf(u.pdf);
+    let allgemein = '';
+    for (let i = 1; i <= doc.numPages; i++) {
+      const page = await doc.getPage(i), H = page.getViewport({ scale: 1 }).height;
+      const items = (await page.getTextContent()).items.filter(x => x.str.trim());
+      const text = items.map(x => x.str).join(' ');
+      const zeit = zeitAusText(text); if (!zeit) continue;
+      allgemein = allgemein || zeit;
+      const low = text.toLowerCase();
+      // Adressfeld: nach „An“ bis zur Zeile mit der Postleitzahl, sonst das obere Viertel der Seite
+      const ai = items.findIndex(x => /^(an|herrn?|frau|familie)$/i.test(x.str.trim()) && x.transform[5] > H * 0.6);
+      let addr = [];
+      if (ai >= 0) for (const x of items.slice(ai + 1, ai + 8)) { addr.push(x); if (/^\d{4}\s/.test(x.str.trim())) break; }
+      else addr = items.filter(x => x.transform[5] > H * 0.72);
+      const top = addr.map(x => x.str).join(' ').toLowerCase();
+      const has = (b, t) => { const k = nameTokens(b.name); return k.length && k.every(x => t.includes(x)); };
+      let hits = ow.filter(b => has(b, top));
+      if (!hits.length) hits = ow.filter(b => has(b, low));
+      for (const b of hits) if (!found.has(b.id)) found.set(b.id, zeit);
+    }
+    // Eine gemeinsame Einladung ohne Namen: dieselbe Zeit für alle
+    if (!found.size && allgemein && doc.numPages <= 2) ow.forEach(b => found.set(b.id, allgemein));
+    doc.destroy();
+  }
+  for (const b of ow) if (found.has(b.id)) b.einladung = found.get(b.id);
+  return found.size;
 }
 
 /* ---------- Demo (Plan der Kanzlei, Personen fiktiv) ---------- */
@@ -276,14 +323,14 @@ function demoSource() {
       { planverfasser: 'Archiv (Planverfasser lt. Plankopf)', geschaeftszahl: 'GFN 1958', anmerkung: 'Plan aus 1958, Grundlage für die Wiederherstellung', datei: 'behelfe/GFN_1958.pdf' },
     ],
     beteiligte: [
-      { ez: '1012', gst: '.626', name: 'Johann Steiner', einladung: '09:00', anschrift: 'Kapellenweg 7, 8101 Gratkorn', rolle: 'Eigentümer' },
-      { ez: '1012', gst: '.626', name: 'Maria Steiner', einladung: '09:00', anschrift: 'Kapellenweg 7, 8101 Gratkorn', rolle: 'Eigentümer' },
-      { ez: '988', gst: '.627', name: 'Elisabeth Pichler', einladung: '09:00', anschrift: 'Kapellenweg 9, 8101 Gratkorn', rolle: 'Eigentümer' },
-      { ez: '540', gst: '784/5', name: 'Franz Hofer', einladung: '09:30', anschrift: 'Dorfstraße 12, 8101 Gratkorn', rolle: 'Eigentümer' },
-      { ez: '536', gst: '783/15', name: 'Christine Weber', einladung: '09:30', anschrift: 'Kapellenweg 3, 8101 Gratkorn', rolle: 'Eigentümer' },
-      { ez: '975', gst: '.625', name: 'Karl Wolf', einladung: '10:00', anschrift: 'Kapellenweg 5, 8101 Gratkorn', rolle: 'Eigentümer' },
-      { ez: '50000', gst: '823', name: 'Marktgemeinde Gratkorn (öffentliches Gut)', einladung: '10:00', anschrift: 'Gemeindeamt, 8101 Gratkorn', rolle: 'Eigentümer' },
-      { name: 'Ing. Peter Lang', einladung: '10:00', anschrift: 'Gemeindeamt, 8101 Gratkorn', rolle: 'Vertreter', vertritt: 'Marktgemeinde Gratkorn' },
+      { ez: '1012', gst: '.626', name: 'Johann Steiner', anschrift: 'Kapellenweg 7, 8101 Gratkorn', rolle: 'Eigentümer' },
+      { ez: '1012', gst: '.626', name: 'Maria Steiner', anschrift: 'Kapellenweg 7, 8101 Gratkorn', rolle: 'Eigentümer' },
+      { ez: '988', gst: '.627', name: 'Elisabeth Pichler', anschrift: 'Kapellenweg 9, 8101 Gratkorn', rolle: 'Eigentümer' },
+      { ez: '540', gst: '784/5', name: 'Franz Hofer', anschrift: 'Dorfstraße 12, 8101 Gratkorn', rolle: 'Eigentümer' },
+      { ez: '536', gst: '783/15', name: 'Christine Weber', anschrift: 'Kapellenweg 3, 8101 Gratkorn', rolle: 'Eigentümer' },
+      { ez: '975', gst: '.625', name: 'Karl Wolf', anschrift: 'Kapellenweg 5, 8101 Gratkorn', rolle: 'Eigentümer' },
+      { ez: '50000', gst: '823', name: 'Marktgemeinde Gratkorn (öffentliches Gut)', anschrift: 'Gemeindeamt, 8101 Gratkorn', rolle: 'Eigentümer' },
+      { name: 'Ing. Peter Lang', anschrift: 'Gemeindeamt, 8101 Gratkorn', rolle: 'Vertreter', vertritt: 'Marktgemeinde Gratkorn' },
     ],
   };
 }
@@ -300,6 +347,7 @@ async function createDemo() {
   const src = demoSource();
   src.skizzePdf = f.skizze; src.behelfe[0].pdf = f.gfn; src.unterlagen[0].pdf = f.einladung; src.unterlagen[1].pdf = f.angebot;
   const v = newVerhandlung(src);
+  await einladungenLesen(v).catch(() => 0);
   v.log[0].text = 'Demo-Verhandlung angelegt (Plan der Kanzlei, Personen fiktiv)';
   await DB.put(v);
   return v;
@@ -474,7 +522,7 @@ function gatePage(page, view) {
   put(page, pageHead(st ? st.t : 'Noch nicht eröffnet'),
     h('div', { class: 'card stack gate' },
       notice('brand', 'clock', h('strong', {}, 'Die Verhandlung ist noch nicht eröffnet.'),
-        h('span', {}, 'Skizze, Grenzverlauf und Abschluss sind erst nach der Eröffnung möglich. Wer schon da ist, kann vorher als anwesend oder vertreten angehakt werden.')),
+        h('span', {}, 'Skizze, Grenzverlauf und Abschluss sind erst nach der Eröffnung möglich. Anwesend, Vertreten oder Abwesend kann schon vorher gewählt werden.')),
       h('div', {}, h('button', { class: 'btn primary', type: 'button', onclick: () => setView('eroeffnung') }, 'Zur Eröffnung'))));
 }
 function rerender() { const y = window.scrollY; setView(app.view); window.scrollTo(0, y); }
@@ -555,9 +603,9 @@ function personCard(b) {
   const z = ZUST[b.zustimmung.art];
   const editing = app.editing === b.id;
   const setAnw = val => {
-    b.anwesend = val === 'da'; b.vertreten = val === 'vertreten';
+    b.anwesend = val === 'da'; b.vertreten = val === 'vertreten'; b.abwesend = val === 'abwesend';
     if (b.vertreten && !b.vertreter.name) app.focusVertreter = b.id;
-    logEvent(`${b.name || 'Person'} ${b.anwesend ? 'anwesend' : b.vertreten ? 'vertreten' : 'nicht anwesend'}`); re();
+    logEvent(`${b.name || 'Person'} ${b.anwesend ? 'anwesend' : b.vertreten ? 'vertreten' : b.abwesend ? 'abwesend' : 'Anwesenheit offen'}`); re();
   };
   const vName = h('input', { type: 'text', value: b.vertreter.name, disabled: L, placeholder: 'Vor- und Nachname', 'aria-label': `Vertreter für ${b.name}`,
     oninput: e => { b.vertreter.name = e.target.value; touch(); }, onchange: () => logEvent(`${b.name}: vertreten durch ${b.vertreter.name}`) });
@@ -574,9 +622,10 @@ function personCard(b) {
       isOwner && b.zustimmung.art !== 'offen' ? h('span', { class: 'pill ' + z.cls }, z.label) : null),
     h('div', { class: 'controls' },
       isOwner
-        ? seg([['da', 'anwesend', 'Eigentümer ist selbst da'], ['vertreten', 'vertreten', 'Eigentümer wird vertreten']], b.anwesend ? 'da' : b.vertreten ? 'vertreten' : '', setAnw, L, 'Anwesenheit')
+        ? seg([['da', 'Anwesend', 'Eigentümer ist selbst da'], ['vertreten', 'Vertreten', 'Eigentümer wird vertreten'], ['abwesend', 'Abwesend', 'Eigentümer ist nicht da und nicht vertreten']],
+          b.anwesend ? 'da' : b.vertreten ? 'vertreten' : b.abwesend ? 'abwesend' : '', setAnw, L, 'Anwesenheit')
         : sw('anwesend', b.anwesend, val => { b.anwesend = val; logEvent(`${b.name || 'Person'} ${val ? 'anwesend' : 'nicht anwesend'}`); re(); }, L),
-      isOwner && b.vertreten ? null : h('span', { class: 'row', style: 'gap:6px' }, h('span', { class: 'lbl' }, 'Identität'),
+      isOwner && (b.vertreten || b.abwesend) ? null : h('span', { class: 'row', style: 'gap:6px' }, h('span', { class: 'lbl' }, 'Identität'),
         seg(IDNACHWEIS, b.idnachweis, val => { b.idnachweis = val; re(); }, L || !b.anwesend, 'Identitätsnachweis')),
       b.rolle === 'Vertreter' ? h('span', { class: 'row', style: 'gap:6px' }, h('span', { class: 'lbl' }, 'Vollmacht'),
         seg(VOLLMACHT, b.vollmacht, val => { b.vollmacht = val; re(); }, L, 'Vollmacht')) : null,
@@ -667,7 +716,7 @@ VIEWS.eroeffnung = page => {
     behelfeVorhalten(),
     h('div', { class: 'page-head' },
       h('div', {}, h('h2', {}, 'Anwesende'),
-        h('p', { class: 'lead' }, (isOpened() ? '' : 'Geht schon vor der Eröffnung. ') + 'Bei jedem Eigentümer „anwesend“ oder „vertreten“ antippen und die Identität wählen: P persönlich bekannt, A allgemein bekannt, L Lichtbildausweis.')),
+        h('p', { class: 'lead' }, (isOpened() ? '' : 'Geht schon vor der Eröffnung. ') + 'Bei jedem Eigentümer „Anwesend“, „Vertreten“ oder „Abwesend“ antippen und die Identität wählen: P persönlich bekannt, A allgemein bekannt, L Lichtbildausweis.')),
       h('button', { class: 'btn', type: 'button', disabled: L, onclick: () => {
         const b = newPerson({ rolle: 'Anwesend (sonstige)' }); b.anwesend = true; b.lokal = true; v.beteiligte.push(b); app.editing = b.id; touch(); rerender();
       } }, icon('plus'), 'Person')),
@@ -686,6 +735,12 @@ function einladungFehlt() {
       if (!t.value) { toast('Bitte zuerst eine Uhrzeit wählen.'); return; }
       ohne.forEach(b => { b.einladung = t.value; }); touch(); rerender(); toast(`Einladung ${t.value} Uhr bei ${ohne.length} Person${ohne.length === 1 ? '' : 'en'} eingetragen`);
     } }, 'Für alle ohne Zeit setzen'),
+    v.unterlagen.some(u => /ladung/i.test(`${u.titel} ${u.datei}`)) ? h('button', { class: 'btn small ghost', type: 'button', onclick: async e => {
+      e.currentTarget.disabled = true;
+      const n = await einladungenLesen(v).catch(() => 0);
+      if (n) { logEvent(`Einladungszeiten aus der Einladung gelesen (${n})`); touch(true); rerender(); toast(`${n} Einladungszeit${n === 1 ? '' : 'en'} aus der Einladung übernommen`); }
+      else { toast('In der Einladung wurde keine passende Uhrzeit gefunden (gescannt oder Namen anders geschrieben?).'); e.target.disabled = false; }
+    } }, icon('pdf'), 'Aus der Einladung lesen') : null,
     h('span', { class: 'muted', style: 'font-size:.85rem' }, 'Einzelne Zeiten unter „Bearbeiten“.'));
 }
 
@@ -862,6 +917,7 @@ function pflichtpruefung(v) {
     ['Eröffnungszeit erfasst', !!v.meta.eroeffnung, 'eroeffnung'],
     ['Verhandlungsleiter eingetragen', !!v.meta.leiter, 'eroeffnung'],
     ['Mindestens eine anwesende oder vertretene Person', anw.length > 0 || vtr.length > 0, 'eroeffnung'],
+    ['Bei allen Eigentümern Anwesend, Vertreten oder Abwesend gewählt', owners(v).every(b => b.anwesend || b.vertreten || b.abwesend), 'eroeffnung'],
     ['Name, Identität und Vollmacht bei allen Vertretern', vtr.every(b => b.vertreter.name.trim() && b.vertreter.idnachweis && b.vertreter.vollmacht), 'eroeffnung'],
     ['Identitätsnachweis bei allen Anwesenden', anw.length > 0 && anw.every(b => b.idnachweis), 'eroeffnung'],
     ['Vollmacht bei allen anwesenden Vertretern', anw.filter(b => b.rolle === 'Vertreter').every(b => b.vollmacht), 'eroeffnung'],
