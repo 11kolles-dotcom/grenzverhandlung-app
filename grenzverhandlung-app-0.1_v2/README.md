@@ -1,45 +1,58 @@
-# Digitale Grenzverhandlung – Prototyp 0.1
+# Digitale Grenzverhandlung – Prototyp 0.3 (ADP Rinner)
 
 Offline-Web-App (PWA) für die Grenzverhandlung nach § 43 Abs. 6 VermG. Prototyp zur Masterarbeit „Anwendung von E-Geo-Government in der österreichischen Katastervermessung“ (TU Graz), Kapitel 6.5.
 
-## Funktionen
+## Neu in 0.3
 
-1. Start: Auswahl der Geschäftszahl, Import eines Verhandlungspakets (ZIP), Demo-Verhandlung mit fiktiven Daten
-2. Eröffnung: Kopfdaten, Eröffnungszeit, Beteiligte mit Anwesenheit, Identitätsnachweis (P/A/L) und Vollmacht
-3. Behelfe: GFN-Pläne als PDF, stufenloser Zoom (zwei Finger, Mausrad, Tasten)
-4. Begehungsskizze: Stift zeichnet, Finger verschiebt und zoomt; Text, Radierer, Rückgängig, Farben
-5. Grenzbeschreibung mit Textbausteinen und strittigen Abschnitten
-6. Prüfen und sperren: Pflichtfeldprüfung, Vorschau, Sperre mit SHA-256-Prüfsumme
-7. Zustimmung: je Eigentümer QES mit ID Austria (über pdf.egiz.gv.at), Papier oder verweigert; Prüfung, dass das signierte PDF den gesperrten Inhalt unverändert enthält
-8. Export: Protokoll-PDF (Seiten 1–3 plus Skizze als Beilage), Verhandlungsdaten als JSON, Verlauf, Löschen vom Gerät
+- Protokoll-PDF nach der Vorlage der Kanzlei: Briefkopf mit Logo und Tabelle (Vermessungsamt, KG, Seite, Projekt), Texte und Tabellen wie in der Vorlage, Skizze als Beilage
+- GFN-Behelfe werden bei der Eröffnung angehakt und stehen dann mit Planverfasser und Geschäftszahl im Protokoll
+- Unterschrift mit dem Stift als zusätzliche Option (nur Information): erscheint in der Spalte „Unterschrift“ einer eigenen Ausfertigung
+- Teilprotokoll (vorzeitige Zustimmung) aus 0.2 wieder entfernt
+
+## Neu in 0.2
+
+- Oberfläche im Erscheinungsbild der Kanzlei, Übersicht je GZ, Personenkarten, Behelfe-Galerie, Grenzzeichen-Werkzeug in der Skizze
+
+## Ablauf
+
+1. Start: Auswahl der Geschäftszahl, Import eines Verhandlungspakets (ZIP), Demo-Verhandlung
+2. Übersicht und Eröffnung (Uhrzeit mit einem Tipp)
+3. Eröffnung: Kopfdaten, GFN-Behelfe anhaken, Beteiligte mit Anwesenheit, Identitätsnachweis und Vollmacht
+4. Behelfe: GFN-Pläne als PDF, stufenloser Zoom
+5. Begehungsskizze: Stift zeichnet, Finger verschiebt und zoomt; Grenzzeichen, Text, Radierer, Rückgängig
+6. Grenzverlauf mit Textbausteinen und strittigen Abschnitten
+7. Prüfen und sperren: Pflichtangaben nach § 13 VermV 2016, Vorschau, Sperre mit SHA-256-Prüfsumme
+8. Zustimmung: je Eigentümer QES mit ID Austria (über pdf.egiz.gv.at), Papier, Stift (nur Information) oder verweigert
+9. Export: Protokoll, Ausfertigung mit Stift-Unterschriften und Verhandlungsdaten als ZIP; Löschen vom Gerät
 
 ## Verhandlungspaket (ZIP)
 
 ```
 verhandlung.json
 skizze.pdf
-behelfe/3127-1968.pdf
-behelfe/412-1987.pdf
+behelfe/GFN_1958.pdf
 ```
 
 `verhandlung.json`:
 
 ```json
 {
-  "gz": "24017-001",
+  "gz": "19389",
   "vermessungsamt": "Graz",
-  "katastralgemeinde": "63107 Algersdorf",
-  "ort": "Graz, Algersdorfer Straße",
+  "katastralgemeinde": "63243 Kirchenviertel",
+  "gemeinde": "Gratkorn",
+  "ort": "Gratkorn, Kapellenweg",
   "datum": "2026-11-25",
-  "verhandlungsleiter": "Ing. Max Muster",
-  "kanzlei": "Vermessungskanzlei …",
+  "verhandlungsleiter": "DI Max Muster",
+  "kanzlei": "ADP Rinner ZT GmbH, Münzgrabenstraße 4/1, 8010 Graz",
+  "gegenstand": "Umwandlung des Grundstücks .626 in den Grenzkataster",
   "skizze": "skizze.pdf",
   "behelfe": [
-    { "planverfasser": "Dipl.-Ing. H. Beispiel", "geschaeftszahl": "3127/1968", "anmerkung": "Teilungsplan", "datei": "behelfe/3127-1968.pdf" }
+    { "planverfasser": "…", "geschaeftszahl": "GFN 1958", "anmerkung": "Plan aus 1958", "datei": "behelfe/GFN_1958.pdf" }
   ],
   "beteiligte": [
-    { "ez": "67", "gst": "259/66", "name": "Anna Berger", "anschrift": "Hauptplatz 3, 8010 Graz", "rolle": "Eigentümer" },
-    { "name": "Thomas Huber", "anschrift": "…", "rolle": "Vertreter", "vertritt": "Beispiel Projekt GmbH" }
+    { "ez": "1012", "gst": ".626", "name": "Johann Steiner", "anschrift": "Kapellenweg 7, 8101 Gratkorn", "rolle": "Eigentümer" },
+    { "name": "Ing. Peter Lang", "anschrift": "Gemeindeamt, 8101 Gratkorn", "rolle": "Vertreter", "vertritt": "Marktgemeinde Gratkorn" }
   ]
 }
 ```
@@ -54,13 +67,13 @@ Lokal testen: `python3 -m http.server 8000` in diesem Ordner, dann `http://local
 
 Daten liegen ausschließlich im Browser-Speicher (IndexedDB) des Geräts.
 
-## Bibliotheken
+## Bibliotheken und Schrift
 
-pdf.js 3.11.174 (Apache 2.0), pdf-lib 1.17.1 (MIT), JSZip 3.10.1 (MIT/GPLv3), alle lokal in `libs/`.
+pdf.js 3.11.174 (Apache 2.0), pdf-lib 1.17.1 (MIT), JSZip 3.10.1 (MIT/GPLv3), Schrift Inter (SIL OFL 1.1), alle lokal.
 
 ## Grenzen des Prototyps
 
 - Die Signatur läuft über den kostenlosen EGIZ-Dienst ohne Verfügbarkeitsgarantie; Ablauf mit echtem ID-Austria-Konto noch nicht getestet.
 - Die Signaturfelder im PDF sind beschriftet, aber keine QR-Platzhalter für den EGIZ-Dienst.
 - Kein Abgleich mit Kanzleisoftware; Austausch nur über Dateien.
-- Keine Stift-Unterschrift als Information (Anforderung A12, „Kann“).
+- Die Stift-Unterschrift ist nur Information (Anforderung A12, „Kann“) und ersetzt weder QES noch Papier.

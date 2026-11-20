@@ -4,44 +4,44 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Digitale Grenzverhandlung</title>
-<meta name="theme-color" content="#1f4e5f">
+<meta name="theme-color" content="#9b1b22">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="stylesheet" href="styles.css">
 </head>
-<body>
-<header class="topbar">
-  <button id="btn-home" class="topbar-home" type="button" aria-label="Zur Übersicht">
-    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 12l8-7 8 7M6 10v9h12v-9" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+<body class="is-start">
+
+<!-- App-Kopf (in der Verhandlung) -->
+<header class="topbar" id="topbar">
+  <button id="btn-home" class="icon-btn" type="button" aria-label="Zur Verhandlungsauswahl" title="Zur Verhandlungsauswahl">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
   </button>
+  <span class="logo-chip"><img src="assets/logo.png" alt="Vermessung ADP Rinner" width="132" height="39"></span>
   <div class="topbar-title">
-    <span class="eyebrow">Digitale Grenzverhandlung</span>
-    <strong id="topbar-gz">Übersicht</strong>
+    <strong id="topbar-gz">GZ</strong>
+    <span id="topbar-sub" class="muted"></span>
   </div>
-  <span id="topbar-status" class="pill" hidden></span>
-  <span id="net" class="net" title="Netzstatus"></span>
+  <span id="topbar-status" class="pill"></span>
+  <span id="net" class="net" title="Netzstatus"><span class="dot"></span><span class="net-label">online</span></span>
 </header>
 
-<div class="layout">
-  <nav id="sidenav" class="sidenav" hidden aria-label="Schritte der Verhandlung">
-    <button data-view="eroeffnung" type="button"><span class="n">1</span>Eröffnung und Beteiligte</button>
-    <button data-view="behelfe" type="button"><span class="n">2</span>Behelfe (GFN)</button>
-    <button data-view="skizze" type="button"><span class="n">3</span>Begehungsskizze</button>
-    <button data-view="beschreibung" type="button"><span class="n">4</span>Grenzbeschreibung</button>
-    <button data-view="abschluss" type="button"><span class="n">5</span>Prüfen und sperren</button>
-    <button data-view="zustimmung" type="button"><span class="n">6</span>Zustimmung</button>
-    <button data-view="export" type="button"><span class="n">7</span>Export</button>
-  </nav>
+<div class="shell">
+  <nav id="stepper" class="stepper" aria-label="Ablauf der Grenzverhandlung"></nav>
   <main id="main" class="main" tabindex="-1"></main>
 </div>
+<footer id="actionbar" class="actionbar" hidden>
+  <button id="btn-back" class="btn ghost" type="button">Zurück</button>
+  <span id="actionbar-hint" class="muted"></span>
+  <button id="btn-next" class="btn primary" type="button">Weiter</button>
+</footer>
 
 <!-- PDF-Ansicht für Behelfe und Skizze -->
 <div id="viewer" class="viewer" hidden>
   <div class="viewer-bar">
-    <button id="v-close" type="button" class="btn">Schließen</button>
+    <button id="v-close" type="button" class="btn">Fertig</button>
     <strong id="v-title" class="v-title"></strong>
-    <div class="v-pages">
+    <div class="v-pages" id="v-pagenav">
       <button id="v-prev" type="button" class="btn icon" aria-label="Vorherige Seite">‹</button>
       <span id="v-pageinfo">1 / 1</span>
       <button id="v-next" type="button" class="btn icon" aria-label="Nächste Seite">›</button>
@@ -50,20 +50,32 @@
       <button id="v-zoomout" type="button" class="btn icon" aria-label="Verkleinern">−</button>
       <span id="v-zoomlabel">100 %</span>
       <button id="v-zoomin" type="button" class="btn icon" aria-label="Vergrößern">+</button>
-      <button id="v-fit" type="button" class="btn">Einpassen</button>
+      <button id="v-fit" type="button" class="btn">Ganzes Blatt</button>
     </div>
   </div>
   <div id="v-tools" class="viewer-tools" hidden>
     <div class="seg" role="group" aria-label="Werkzeug">
-      <button type="button" data-tool="pen" class="on">Stift</button>
-      <button type="button" data-tool="text">Text</button>
-      <button type="button" data-tool="erase">Radierer</button>
-      <button type="button" data-tool="hand">Hand</button>
+      <button type="button" data-tool="pen" class="on"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l4-1 11-11-3-3L5 16z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>Stift</button>
+      <button type="button" data-tool="symbol"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/></svg>Grenzzeichen</button>
+      <button type="button" data-tool="text"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14M12 6v13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>Text</button>
+      <button type="button" data-tool="erase"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 16l8-8 6 6-5 5H8zM13 19h7" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>Radierer</button>
+      <button type="button" data-tool="hand"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 12V6a1.5 1.5 0 013 0v5V4.5a1.5 1.5 0 013 0V11V6a1.5 1.5 0 013 0v8a6 6 0 01-6 6h-1a6 6 0 01-5-3l-2-4a1.5 1.5 0 012.5-1.6z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>Verschieben</button>
     </div>
+    <select id="v-symbol" class="symbol-select" aria-label="Art des Grenzzeichens" hidden>
+      <option value="GS">GS – Grenzstein</option>
+      <option value="MM" selected>MM – Marke Metall</option>
+      <option value="MK">MK – Marke Kunststoff</option>
+      <option value="ER">ER – Rohr (Eisen)</option>
+      <option value="NG">NG – Vermessungsnagel</option>
+      <option value="HN">HN – Hiltinagel</option>
+      <option value="ME">ME – Mauerecke</option>
+      <option value="HE">HE – Hausecke</option>
+      <option value="ZS">ZS – Zaunsäule</option>
+    </select>
     <div class="seg" role="group" aria-label="Farbe">
-      <button type="button" data-color="#d0021b" class="swatch on" style="--sw:#d0021b" aria-label="Rot"></button>
+      <button type="button" data-color="#d0021b" class="swatch on" style="--sw:#d0021b" aria-label="Rot, neu"></button>
+      <button type="button" data-color="#111111" class="swatch" style="--sw:#111111" aria-label="Schwarz, alt"></button>
       <button type="button" data-color="#0b57d0" class="swatch" style="--sw:#0b57d0" aria-label="Blau"></button>
-      <button type="button" data-color="#111111" class="swatch" style="--sw:#111111" aria-label="Schwarz"></button>
       <button type="button" data-color="#108a3e" class="swatch" style="--sw:#108a3e" aria-label="Grün"></button>
     </div>
     <div class="seg" role="group" aria-label="Strichstärke">
@@ -71,17 +83,18 @@
       <button type="button" data-width="1.6" class="on">mittel</button>
       <button type="button" data-width="3">dick</button>
     </div>
-    <button id="v-undo" type="button" class="btn">Rückgängig</button>
-    <label class="check"><input id="v-finger" type="checkbox"> Mit Finger zeichnen</label>
+    <button id="v-undo" type="button" class="btn">↶ Rückgängig</button>
+    <label class="check small"><input id="v-finger" type="checkbox"> mit Finger zeichnen</label>
   </div>
   <div id="v-stage" class="viewer-stage">
     <div id="v-sheet" class="sheet">
       <canvas id="v-pdf"></canvas>
       <canvas id="v-ink"></canvas>
     </div>
+    <div id="v-hint" class="v-hint" hidden></div>
   </div>
   <div id="v-textbox" class="textbox" hidden>
-    <input id="v-textinput" type="text" placeholder="Text eingeben, z. B. GP 2547" aria-label="Text für die Skizze">
+    <input id="v-textinput" type="text" placeholder="Text, z. B. GP 4325 neu" aria-label="Text für die Skizze">
     <button id="v-textok" type="button" class="btn primary">Einfügen</button>
     <button id="v-textcancel" type="button" class="btn">Abbrechen</button>
   </div>
