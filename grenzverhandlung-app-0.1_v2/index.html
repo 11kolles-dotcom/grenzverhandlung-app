@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Digitale Grenzverhandlung</title>
+<meta name="theme-color" content="#1f4e5f">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="topbar">
+  <button id="btn-home" class="topbar-home" type="button" aria-label="Zur Übersicht">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 12l8-7 8 7M6 10v9h12v-9" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+  </button>
+  <div class="topbar-title">
+    <span class="eyebrow">Digitale Grenzverhandlung</span>
+    <strong id="topbar-gz">Übersicht</strong>
+  </div>
+  <span id="topbar-status" class="pill" hidden></span>
+  <span id="net" class="net" title="Netzstatus"></span>
+</header>
+
+<div class="layout">
+  <nav id="sidenav" class="sidenav" hidden aria-label="Schritte der Verhandlung">
+    <button data-view="eroeffnung" type="button"><span class="n">1</span>Eröffnung und Beteiligte</button>
+    <button data-view="behelfe" type="button"><span class="n">2</span>Behelfe (GFN)</button>
+    <button data-view="skizze" type="button"><span class="n">3</span>Begehungsskizze</button>
+    <button data-view="beschreibung" type="button"><span class="n">4</span>Grenzbeschreibung</button>
+    <button data-view="abschluss" type="button"><span class="n">5</span>Prüfen und sperren</button>
+    <button data-view="zustimmung" type="button"><span class="n">6</span>Zustimmung</button>
+    <button data-view="export" type="button"><span class="n">7</span>Export</button>
+  </nav>
+  <main id="main" class="main" tabindex="-1"></main>
+</div>
+
+<!-- PDF-Ansicht für Behelfe und Skizze -->
+<div id="viewer" class="viewer" hidden>
+  <div class="viewer-bar">
+    <button id="v-close" type="button" class="btn">Schließen</button>
+    <strong id="v-title" class="v-title"></strong>
+    <div class="v-pages">
+      <button id="v-prev" type="button" class="btn icon" aria-label="Vorherige Seite">‹</button>
+      <span id="v-pageinfo">1 / 1</span>
+      <button id="v-next" type="button" class="btn icon" aria-label="Nächste Seite">›</button>
+    </div>
+    <div class="v-zoom">
+      <button id="v-zoomout" type="button" class="btn icon" aria-label="Verkleinern">−</button>
+      <span id="v-zoomlabel">100 %</span>
+      <button id="v-zoomin" type="button" class="btn icon" aria-label="Vergrößern">+</button>
+      <button id="v-fit" type="button" class="btn">Einpassen</button>
+    </div>
+  </div>
+  <div id="v-tools" class="viewer-tools" hidden>
+    <div class="seg" role="group" aria-label="Werkzeug">
+      <button type="button" data-tool="pen" class="on">Stift</button>
+      <button type="button" data-tool="text">Text</button>
+      <button type="button" data-tool="erase">Radierer</button>
+      <button type="button" data-tool="hand">Hand</button>
+    </div>
+    <div class="seg" role="group" aria-label="Farbe">
+      <button type="button" data-color="#d0021b" class="swatch on" style="--sw:#d0021b" aria-label="Rot"></button>
+      <button type="button" data-color="#0b57d0" class="swatch" style="--sw:#0b57d0" aria-label="Blau"></button>
+      <button type="button" data-color="#111111" class="swatch" style="--sw:#111111" aria-label="Schwarz"></button>
+      <button type="button" data-color="#108a3e" class="swatch" style="--sw:#108a3e" aria-label="Grün"></button>
+    </div>
+    <div class="seg" role="group" aria-label="Strichstärke">
+      <button type="button" data-width="0.8">fein</button>
+      <button type="button" data-width="1.6" class="on">mittel</button>
+      <button type="button" data-width="3">dick</button>
+    </div>
+    <button id="v-undo" type="button" class="btn">Rückgängig</button>
+    <label class="check"><input id="v-finger" type="checkbox"> Mit Finger zeichnen</label>
+  </div>
+  <div id="v-stage" class="viewer-stage">
+    <div id="v-sheet" class="sheet">
+      <canvas id="v-pdf"></canvas>
+      <canvas id="v-ink"></canvas>
+    </div>
+  </div>
+  <div id="v-textbox" class="textbox" hidden>
+    <input id="v-textinput" type="text" placeholder="Text eingeben, z. B. GP 2547" aria-label="Text für die Skizze">
+    <button id="v-textok" type="button" class="btn primary">Einfügen</button>
+    <button id="v-textcancel" type="button" class="btn">Abbrechen</button>
+  </div>
+</div>
+
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+<input id="file-zip" type="file" accept=".zip,application/zip" hidden>
+<input id="file-signed" type="file" accept="application/pdf,.pdf" hidden>
+
+<script src="libs/pdf.min.js"></script>
+<script src="libs/pdf-lib.min.js"></script>
+<script src="libs/jszip.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
