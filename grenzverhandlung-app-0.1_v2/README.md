@@ -1,6 +1,23 @@
-# Digitale Grenzverhandlung – Prototyp 0.4 (ADP Rinner)
+# Digitale Grenzverhandlung – Prototyp 0.5 (ADP Rinner)
 
 Offline-Web-App (PWA) für die Grenzverhandlung nach § 43 Abs. 6 VermG. Prototyp zur Masterarbeit „Anwendung von E-Geo-Government in der österreichischen Katastervermessung“ (TU Graz), Kapitel 6.5.
+
+## Neu in 0.5
+
+- Unterlagen: Angebot, Einladungen und andere PDFs kommen im Ordner `unterlagen/` des Verhandlungspakets mit und sind in der App über den Knopf „Unterlagen“ oben jederzeit einsehbar. Vor Ort lassen sich weitere PDFs ergänzen; diese gehen beim Export mit.
+- Büro-Seite `paket.html` („Paket erstellen“): Kopfdaten, Beteiligte (auch aus Excel einfügen), GFN, Skizze und Unterlagen eintragen bzw. hineinziehen und als ZIP speichern
+- Demo enthält eine fiktive Einladung und ein fiktives Angebot
+- Grundbuchsabfrage: In „Paket erstellen“ die beiden CSV-Dateien (Eigentümer und Grundstücke) gemeinsam hineinziehen. Die Eigentümer werden mit Titel, Anschrift, EZ und Gst.-Nr. übernommen (Zuordnung über KG und EZ), die GFN aus der Grundstücksabfrage als Behelfe vorgeschlagen; GFN-PDFs werden über die Nummer im Dateinamen zugeordnet. Geburtsdaten und Anteile werden nicht übernommen.
+- Fotos: Knopf „Fotos“ oben, Aufnahme mit der Kamera des Tablets, Notiz je Foto. Die Fotos gehen beim Export im Ordner `fotos/` ins Büro, nicht ins Protokoll.
+- Links zum Kataster des BEV und zu GIS Steiermark im Bereich „Unterlagen“ (brauchen Internet)
+
+## Ablauf mit dem Büro
+
+1. Büro: `paket.html` am PC öffnen, Paket erstellen, ZIP in den Projektordner legen
+2. Tablet: ZIP über einen synchronisierten Ordner (OneDrive/Nextcloud), USB oder internen Server holen und in der App importieren. Kein Versand an private Mail-Adressen (DSGVO).
+3. Vor Ort: Verhandlung offline führen
+4. Export „Alles für die Kanzlei (ZIP)“ zurück in den Projektordner
+5. Büro: Papier-Zustimmungen einscannen, Beurkundungssignatur, Upload ins BAIK; danach Verhandlung am Tablet löschen
 
 ## Neu in 0.4
 
@@ -37,7 +54,11 @@ Offline-Web-App (PWA) für die Grenzverhandlung nach § 43 Abs. 6 VermG. Prototy
 verhandlung.json
 skizze.pdf
 behelfe/GFN_1958.pdf
+unterlagen/Angebot.pdf
+unterlagen/Einladung.pdf
 ```
+
+`unterlagen` ist optional: Alle PDFs im Ordner `unterlagen/` werden auch ohne Eintrag übernommen (Titel = Dateiname).
 
 `verhandlung.json`:
 
@@ -53,8 +74,12 @@ behelfe/GFN_1958.pdf
   "kanzlei": "ADP Rinner ZT GmbH, Münzgrabenstraße 4/1, 8010 Graz",
   "gegenstand": "Umwandlung des Grundstücks .626 in den Grenzkataster",
   "skizze": "skizze.pdf",
+  "unterlagen": [
+    { "titel": "Einladung zur Grenzverhandlung", "datei": "unterlagen/Einladung.pdf" }
+  ],
   "behelfe": [
-    { "planverfasser": "…", "geschaeftszahl": "GFN 1958", "anmerkung": "Plan aus 1958", "datei": "behelfe/GFN_1958.pdf" }
+    { "planverfasser": "…", "geschaeftszahl": "GFN 1958", "anmerkung": "Plan aus 1958", "datei": "behelfe/GFN_1958.pdf" },
+    { "geschaeftszahl": "GFN 2775/2020/63", "anmerkung": "ohne PDF: steht trotzdem zur Auswahl" }
   ],
   "beteiligte": [
     { "ez": "1012", "gst": ".626", "name": "Johann Steiner", "anschrift": "Kapellenweg 7, 8101 Gratkorn", "rolle": "Eigentümer" },

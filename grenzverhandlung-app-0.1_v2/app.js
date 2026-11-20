@@ -5,7 +5,7 @@
  */
 'use strict';
 
-const APP_VERSION = '0.4.0';
+const APP_VERSION = '0.5.0';
 const EGIZ_URL = 'https://pdf.egiz.gv.at/';
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'libs/pdf.worker.min.js';
 
@@ -52,6 +52,10 @@ const ICONS = {
   run: 'M13 4a2 2 0 100 .1M9 21l3-6 3 3v3M7 12l3-4 4 1 3 3M10 8l-1 5',
   pdf: 'M7 3h7l5 5v13H7zM14 3v5h5M9 15h6',
   pen: 'M4 20l4-1 11-11-3-3L5 16z',
+  camera: 'M4 8h3l2-3h6l2 3h3v11H4zM12 17a3.5 3.5 0 100-7 3.5 3.5 0 000 7z',
+  map: 'M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3zM9 3v15M15 6v15',
+  docs: 'M8 3h8l4 4v12H8zM16 3v4h4M4 7v14h12M11 11h6M11 15h6',
+  trash: 'M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13',
 };
 const put = (el, ...c) => el.append(...c.flat(Infinity).filter(x => x !== null && x !== undefined && x !== false));
 const SVGNS = 'http://www.w3.org/2000/svg';
@@ -169,6 +173,8 @@ function newVerhandlung(src) {
     beteiligte: (src.beteiligte || []).map(newPerson),
     behelfe: (src.behelfe || []).map(b => ({ id: uid(), planverfasser: b.planverfasser || '', gz: b.geschaeftszahl || '', anmerkung: b.anmerkung || '', vorgehalten: false, pdf: b.pdf, datei: b.datei || '' })),
     skizze: { pdf: src.skizzePdf || null, strokes: [], texts: [], symbols: [] },
+    fotos: [],
+    unterlagen: (src.unterlagen || []).filter(u => u.pdf).map(u => ({ id: uid(), titel: u.titel || titleFromFile(u.datei), datei: u.datei || '', pdf: u.pdf, lokal: false })),
     beschreibung: { text: 'Alte Grenzpunkte wurden aufgrund oben genannter GFN (VHW´s) überprüft bzw. rückgesetzt und einvernehmlich anerkannt.\nDie neuen Grenzpunkte wurden ebenfalls einvernehmlich festgelegt und in der Natur vermarkt.', strittig: '' },
     status: 'vorbereitet', version: 1, locked: null, signed: null,
     log: [{ zeit: Date.now(), text: 'Verhandlungspaket importiert' }],
@@ -178,6 +184,8 @@ function newVerhandlung(src) {
 function migrate(v) {
   v.skizze.symbols = v.skizze.symbols || [];
   delete v.vorab;
+  v.unterlagen = v.unterlagen || [];
+  v.fotos = v.fotos || [];
   v.meta.gemeinde = v.meta.gemeinde || '';
   v.meta.gegenstand = v.meta.gegenstand || '';
   return v;
@@ -201,6 +209,7 @@ function touch(immediate) {
 function logEvent(text) { app.cur.log.push({ zeit: Date.now(), text }); }
 
 /* ---------- Import ---------- */
+const titleFromFile = name => String(name || 'Dokument').split('/').pop().replace(/\.pdf$/i, '').replace(/[_]+/g, ' ').trim();
 async function importZip(file) {
   const zip = await JSZip.loadAsync(file);
   const jf = zip.file('verhandlung.json') || zip.file(/(^|\/)verhandlung\.json$/i)[0];
@@ -213,8 +222,14 @@ async function importZip(file) {
     if (!f) throw new Error(`Datei ${path} fehlt im ZIP.`);
     return new Blob([await f.async('uint8array')], { type: 'application/pdf' });
   };
-  for (const b of src.behelfe || []) b.pdf = await getPdf(b.datei);
+  for (const b of src.behelfe || []) b.pdf = b.datei ? await getPdf(b.datei) : null;
   if (src.skizze) src.skizzePdf = await getPdf(src.skizze);
+  src.unterlagen = Array.isArray(src.unterlagen) ? src.unterlagen : [];
+  for (const u of src.unterlagen) u.pdf = await getPdf(u.datei);
+  const listed = new Set(src.unterlagen.map(u => u.datei));
+  const extra = zip.file(/(^|\/)unterlagen\/[^/]+\.pdf$/i).filter(f => !listed.has(f.name.slice(base.length)) && !listed.has(f.name))
+    .sort((a, b) => a.name.localeCompare(b.name, 'de'));
+  for (const f of extra) src.unterlagen.push({ titel: titleFromFile(f.name), datei: f.name.slice(base.length), pdf: new Blob([await f.async('uint8array')], { type: 'application/pdf' }) });
   return newVerhandlung(src);
 }
 
@@ -226,6 +241,10 @@ function demoSource() {
     kanzlei: 'ADP Rinner ZT GmbH, Münzgrabenstraße 4/1, 8010 Graz',
     gegenstand: 'Umwandlung des Grundstücks .626 in den Grenzkataster',
     skizze: 'skizze.pdf',
+    unterlagen: [
+      { titel: 'Einladung zur Grenzverhandlung', datei: 'unterlagen/Einladung_GZ19389.pdf' },
+      { titel: 'Angebot', datei: 'unterlagen/Angebot_GZ19389.pdf' },
+    ],
     behelfe: [
       { planverfasser: 'Archiv (Planverfasser lt. Plankopf)', geschaeftszahl: 'GFN 1958', anmerkung: 'Plan aus 1958, Grundlage für die Wiederherstellung', datei: 'behelfe/GFN_1958.pdf' },
     ],
@@ -245,12 +264,14 @@ async function demoFiles() {
   return {
     skizze: await fetchBlob('demo/Begehungsplan1.pdf', 'application/pdf'),
     gfn: await fetchBlob('demo/GFN_1958.pdf', 'application/pdf'),
+    einladung: await fetchBlob('demo/Einladung_GZ19389.pdf', 'application/pdf'),
+    angebot: await fetchBlob('demo/Angebot_GZ19389.pdf', 'application/pdf'),
   };
 }
 async function createDemo() {
   const f = await demoFiles();
   const src = demoSource();
-  src.skizzePdf = f.skizze; src.behelfe[0].pdf = f.gfn;
+  src.skizzePdf = f.skizze; src.behelfe[0].pdf = f.gfn; src.unterlagen[0].pdf = f.einladung; src.unterlagen[1].pdf = f.angebot;
   const v = newVerhandlung(src);
   v.log[0].text = 'Demo-Verhandlung angelegt (Plan der Kanzlei, Personen fiktiv)';
   await DB.put(v);
@@ -262,6 +283,8 @@ async function demoZipBlob() {
   zip.file('verhandlung.json', JSON.stringify(demoSource(), null, 2));
   zip.file('skizze.pdf', await f.skizze.arrayBuffer());
   zip.file('behelfe/GFN_1958.pdf', await f.gfn.arrayBuffer());
+  zip.file('unterlagen/Einladung_GZ19389.pdf', await f.einladung.arrayBuffer());
+  zip.file('unterlagen/Angebot_GZ19389.pdf', await f.angebot.arrayBuffer());
   return zip.generateAsync({ type: 'blob' });
 }
 
@@ -379,6 +402,8 @@ function renderChrome() {
   $('#topbar-sub').textContent = [v.meta.kg && `KG ${v.meta.kg}`, deDate(v.meta.datum)].filter(Boolean).join(' · ');
   const s = STATUS[v.status], pill = $('#topbar-status');
   pill.className = 'pill ' + s.cls; pill.textContent = s.label;
+  const dc = $('#docs-count'); dc.textContent = v.unterlagen.length || ''; dc.hidden = !v.unterlagen.length;
+  const fc = $('#fotos-count'); fc.textContent = v.fotos.length || ''; fc.hidden = !v.fotos.length;
 
   const pr = progress(v);
   const nav = $('#stepper');
@@ -433,8 +458,8 @@ VIEWS.start = async page => {
     h('details', {},
       h('summary', {}, 'Wie kommt eine Verhandlung aufs Gerät?'),
       h('div', { class: 'card stack' },
-        h('p', {}, 'Die Kanzlei stellt je Geschäftszahl ein ZIP-Paket zusammen: verhandlung.json mit Kopfdaten, Beteiligten und Behelfen, dazu die Behelfe und die Begehungsskizze als PDF. Telefonnummern und E-Mail-Adressen gehören nicht hinein.'),
-        h('div', {}, h('button', { class: 'btn', type: 'button', onclick: e => busy(e.currentTarget, async () => download(await demoZipBlob(), 'Beispielpaket_19389.zip')) }, 'Beispielpaket herunterladen')))),
+        h('p', {}, 'Die Kanzlei stellt je Geschäftszahl ein ZIP-Paket zusammen: Kopfdaten, Beteiligte, GFN, Begehungsskizze und Unterlagen wie Angebot und Einladungen. Das geht im Büro am PC mit der Seite „Paket erstellen“. Telefonnummern und E-Mail-Adressen gehören nicht hinein.'),
+        h('div', { class: 'row' }, h('a', { class: 'btn', href: 'paket.html' }, icon('folder'), 'Paket erstellen (Büro)'), h('button', { class: 'btn', type: 'button', onclick: e => busy(e.currentTarget, async () => download(await demoZipBlob(), 'Beispielpaket_19389.zip')) }, 'Beispielpaket herunterladen')))),
     h('p', { class: 'start-note' }, `Prototyp ${APP_VERSION} zur Masterarbeit „E-Geo-Government in der österreichischen Katastervermessung“, TU Graz. Daten bleiben ausschließlich auf diesem Gerät.`))));
   app.list = (await DB.all()).map(migrate).sort((a, b) => b.updated - a.updated);
   if (!app.list.length) {
@@ -513,7 +538,8 @@ function behelfeVorhalten() {
           b.vorgehalten = e.target.checked; logEvent(`Behelf ${b.gz} ${b.vorgehalten ? 'vorgehalten' : 'nicht vorgehalten'}`); touch(); rerender();
         } }),
         h('span', {}, h('strong', { class: 'mono' }, b.gz || 'ohne GZ'), h('span', { class: 'muted' }, ` · ${b.planverfasser || 'Planverfasser unbekannt'}${b.anmerkung ? ' · ' + b.anmerkung : ''}`))),
-      h('button', { class: 'btn small', type: 'button', onclick: () => Viewer.open({ blob: b.pdf, title: `Behelf ${b.gz} · ${b.planverfasser}` }) }, icon('zoom'), 'Ansehen'))))
+      b.pdf ? h('button', { class: 'btn small', type: 'button', onclick: () => Viewer.open({ blob: b.pdf, title: `Behelf ${b.gz} · ${b.planverfasser}` }) }, icon('zoom'), 'Ansehen')
+        : h('span', { class: 'muted', style: 'font-size:.85rem' }, 'ohne PDF'))))
       : h('p', { class: 'muted' }, 'Keine Behelfe im Verhandlungspaket.'),
     L ? null : h('div', { style: 'margin-top:10px' },
       h('button', { class: 'btn small ghost', type: 'button', onclick: e => e.currentTarget.nextElementSibling.click() }, icon('plus'), 'GFN-Plan ergänzen (PDF)'),
@@ -563,6 +589,110 @@ VIEWS.eroeffnung = page => {
       } }, icon('plus'), 'Person')),
     h('div', { class: 'grid2' }, v.beteiligte.map(personCard)));
 };
+
+/* ---------- Unterlagen (Angebot, Einladungen …) ---------- */
+function openDocs() {
+  const v = app.cur; if (!v) return;
+  closeDocs();
+  const listEl = h('div', { class: 'docs-list' });
+  const fill = () => {
+    listEl.replaceChildren();
+    if (!v.unterlagen.length) put(listEl, h('p', { class: 'muted', style: 'padding:8px 4px' }, 'Keine Unterlagen im Verhandlungspaket. Die Kanzlei legt sie im Ordner „unterlagen“ des Pakets ab.'));
+    for (const u of v.unterlagen) {
+      put(listEl, h('div', { class: 'doc-row' },
+        h('button', { class: 'doc-open', type: 'button', onclick: () => Viewer.open({ blob: u.pdf, title: u.titel }) },
+          h('span', { class: 'doc-ico' }, icon('pdf')),
+          h('span', { class: 'doc-txt' }, h('b', {}, u.titel), h('small', { class: 'muted' }, u.lokal ? 'vor Ort ergänzt' : (u.datei || 'aus dem Verhandlungspaket')))),
+        u.lokal ? h('button', { class: 'icon-btn', type: 'button', title: 'Entfernen', 'aria-label': `${u.titel} entfernen`, onclick: () => {
+          v.unterlagen = v.unterlagen.filter(x => x !== u); logEvent(`Unterlage ${u.titel} entfernt`); touch(true); fill();
+        } }, icon('trash')) : null));
+    }
+  };
+  const add = h('input', { type: 'file', accept: 'application/pdf', multiple: true, hidden: true, onchange: e => {
+    for (const f of e.target.files) { v.unterlagen.push({ id: uid(), titel: titleFromFile(f.name), datei: f.name, pdf: f, lokal: true }); logEvent(`Unterlage ${f.name} ergänzt`); }
+    touch(true); fill(); e.target.value = '';
+  } });
+  fill();
+  const sheet = h('div', { class: 'docs-sheet', id: 'docs', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Unterlagen' },
+    h('div', { class: 'docs-backdrop', onclick: closeDocs }),
+    h('div', { class: 'docs-panel' },
+      h('div', { class: 'docs-head' },
+        h('div', {}, h('h2', {}, 'Unterlagen'), h('p', { class: 'muted' }, `GZ ${v.gz} · nur zum Ansehen, nicht Teil des Protokolls`)),
+        h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Schließen', onclick: closeDocs }, '✕')),
+      listEl,
+      h('div', { class: 'docs-foot' },
+        h('button', { class: 'btn small ghost', type: 'button', onclick: () => add.click() }, icon('plus'), 'PDF vom Gerät hinzufügen'), add),
+      h('div', { class: 'docs-links' },
+        h('span', { class: 'lbl' }, 'Online-Karten (brauchen Internet)'),
+        KARTEN.map(([t, sub, url]) => h('a', { class: 'doc-open', href: url, target: '_blank', rel: 'noopener' },
+          h('span', { class: 'doc-ico' }, icon('map')), h('span', { class: 'doc-txt' }, h('b', {}, t), h('small', { class: 'muted' }, sub)))))));
+  document.body.append(sheet);
+  sheet.querySelector('.docs-panel button').focus();
+}
+function closeDocs() { const d = $('#docs'); if (d) d.remove(); }
+const KARTEN = [
+  ['Kataster BEV', 'kataster.bev.gv.at · aktueller Kataster mit Orthofoto', 'https://kataster.bev.gv.at/#/center/13.35,47.77/zoom/7.2/ortho/1/vermv/0.6'],
+  ['GIS Steiermark', 'gis.stmk.gv.at · Basiskarten, Kataster', 'https://gis.stmk.gv.at/wgportal/atlasmobile/map/Basiskarten/Kataster'],
+];
+
+/* ---------- Fotos (nicht Teil des Protokolls) ---------- */
+async function shrinkPhoto(file, max = 2400) {
+  try {
+    const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
+    const k = Math.min(1, max / Math.max(bmp.width, bmp.height));
+    const c = document.createElement('canvas'); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+    c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+    return await new Promise(r => c.toBlob(b => r(b || file), 'image/jpeg', 0.85));
+  } catch { return file; }
+}
+function openFotos() {
+  const v = app.cur; if (!v) return;
+  closeDocs();
+  const urls = [];
+  const grid = h('div', { class: 'foto-grid' });
+  const fill = () => {
+    urls.splice(0).forEach(u => URL.revokeObjectURL(u));
+    grid.replaceChildren();
+    if (!v.fotos.length) put(grid, h('p', { class: 'muted', style: 'grid-column:1/-1;padding:8px 4px' }, 'Noch keine Fotos. Fotos gehen beim Export ins Büro mit, sind aber nicht Teil des Protokolls.'));
+    v.fotos.forEach((f, i) => {
+      const u = URL.createObjectURL(f.blob); urls.push(u);
+      put(grid, h('figure', { class: 'foto' },
+        h('button', { class: 'foto-img', type: 'button', 'aria-label': `Foto ${i + 1} groß ansehen`, onclick: () => lightbox(u) }, h('img', { src: u, alt: f.notiz || `Foto ${i + 1}` })),
+        h('figcaption', {},
+          h('span', { class: 'muted' }, `${i + 1} · ${timeOf(f.zeit)} Uhr`),
+          h('input', { type: 'text', value: f.notiz || '', placeholder: 'Notiz, z. B. Grenzstein GP 12', 'aria-label': `Notiz zu Foto ${i + 1}`, oninput: e => { f.notiz = e.target.value; touch(); } }),
+          h('button', { class: 'icon-btn', type: 'button', title: 'Foto löschen', 'aria-label': `Foto ${i + 1} löschen`, onclick: () => {
+            if (!confirm(`Foto ${i + 1} löschen?`)) return;
+            v.fotos.splice(i, 1); logEvent(`Foto ${i + 1} gelöscht`); touch(true); fill();
+          } }, icon('trash')))));
+    });
+  };
+  const takePhotos = async e => {
+    const files = [...e.target.files]; e.target.value = '';
+    for (const file of files) { v.fotos.push({ id: uid(), blob: await shrinkPhoto(file), zeit: Date.now(), notiz: '' }); }
+    if (files.length) { logEvent(`${files.length} Foto${files.length === 1 ? '' : 's'} aufgenommen`); touch(true); fill(); grid.lastElementChild?.scrollIntoView({ block: 'nearest' }); }
+  };
+  const cam = h('input', { type: 'file', accept: 'image/*', capture: 'environment', hidden: true, onchange: takePhotos });
+  const gal = h('input', { type: 'file', accept: 'image/*', multiple: true, hidden: true, onchange: takePhotos });
+  fill();
+  const close = () => { urls.forEach(u => URL.revokeObjectURL(u)); closeDocs(); };
+  const sheet = h('div', { class: 'docs-sheet', id: 'docs', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Fotos' },
+    h('div', { class: 'docs-backdrop', onclick: close }),
+    h('div', { class: 'docs-panel wide' },
+      h('div', { class: 'docs-head' },
+        h('div', {}, h('h2', {}, 'Fotos'), h('p', { class: 'muted' }, `GZ ${v.gz} · gehen mit dem Export ins Büro, nicht ins Protokoll`)),
+        h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Schließen', onclick: close }, '✕')),
+      h('div', { class: 'row' },
+        h('button', { class: 'btn primary big', type: 'button', onclick: () => cam.click() }, icon('camera'), 'Foto aufnehmen'), cam,
+        h('button', { class: 'btn small ghost', type: 'button', onclick: () => gal.click() }, 'Aus Galerie'), gal),
+      grid));
+  document.body.append(sheet);
+}
+function lightbox(url) {
+  const lb = h('div', { class: 'lightbox', role: 'dialog', 'aria-label': 'Foto', onclick: () => lb.remove() },
+    h('img', { src: url, alt: '' }), h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Schließen' }, '✕'));
+  document.body.append(lb);
+}
 
 /* ---------- 3 Begehungsskizze ---------- */
 function openSketch() {
@@ -883,15 +1013,20 @@ function exportJson(v) {
     beteiligte: v.beteiligte.map(({ id, ...b }) => ({ ...b, zustimmung: { art: b.zustimmung.art, zeit: b.zustimmung.zeit ? new Date(b.zustimmung.zeit).toISOString() : null, stiftUnterschrift: !!b.zustimmung.png } })),
     behelfe: v.behelfe.map(b => ({ planverfasser: b.planverfasser, geschaeftszahl: b.gz, anmerkung: b.anmerkung, vorgehalten: b.vorgehalten })),
     beschreibung: v.beschreibung,
+    fotos: v.fotos.map((f, i) => ({ datei: fotoName(v, f, i), zeit: new Date(f.zeit).toISOString(), notiz: f.notiz || '' })),
     skizze: { striche: v.skizze.strokes.length, texte: v.skizze.texts.length, grenzzeichen: v.skizze.symbols.map(s => s.code) },
     verlauf: v.log.map(e => ({ zeit: new Date(e.zeit).toISOString(), text: e.text })),
   };
 }
+const fotoName = (v, f, i) => `fotos/GZ${safeName(v.gz)}_Foto_${pad2(i + 1)}_${timeOf(f.zeit).replace(':', '')}.jpg`;
 async function exportZip(v) {
   const zip = new JSZip();
   zip.file(pdfFileName(v, v.signed ? 'signiert' : 'gesperrt'), await currentPdf().arrayBuffer());
   if (hasStift(v)) zip.file(pdfFileName(v, 'mit_Stift-Unterschriften_Information'), await (await protocolWithSignatures(v)).arrayBuffer());
   zip.file(`Verhandlung_${safeName(v.gz)}_V${v.version}.json`, JSON.stringify(exportJson(v), null, 2));
+  v.fotos.forEach((f, i) => zip.file(fotoName(v, f, i), f.blob));
+  if (v.fotos.length) zip.file('fotos/Fotos.txt', v.fotos.map((f, i) => `${fotoName(v, f, i).slice(6)}\t${deDateTime(f.zeit)}\t${f.notiz || ''}`).join('\r\n'));
+  for (const u of v.unterlagen.filter(x => x.lokal)) zip.file(`vor_Ort_ergaenzt/${safeName(u.titel)}.pdf`, await u.pdf.arrayBuffer());
   return zip.generateAsync({ type: 'blob' });
 }
 VIEWS.export = page => {
@@ -1388,7 +1523,10 @@ function initNet() {
 }
 function init() {
   initViewer(); initNet();
-  $('#btn-home').onclick = () => { if (Viewer.st) Viewer.close(); app.cur = null; setView('start'); };
+  $('#btn-home').onclick = () => { if (Viewer.st) Viewer.close(); closeDocs(); app.cur = null; setView('start'); };
+  $('#btn-docs').onclick = openDocs;
+  $('#btn-fotos').onclick = openFotos;
+  document.addEventListener('keydown', e => { if (e.key !== 'Escape' || Viewer.st) return; const lb = document.querySelector('.lightbox'); if (lb) lb.remove(); else if ($('#docs')) closeDocs(); });
   $('#btn-back').onclick = () => { const i = STEPS.findIndex(x => x.k === app.view); if (i > 0) setView(STEPS[i - 1].k); };
   $('#btn-next').onclick = () => { const i = STEPS.findIndex(x => x.k === app.view); if (i < STEPS.length - 1) setView(STEPS[i + 1].k); };
   $('#file-zip').onchange = async e => {
