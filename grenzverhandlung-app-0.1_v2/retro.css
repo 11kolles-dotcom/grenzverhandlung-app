@@ -123,3 +123,78 @@ body .drop.over { border-style: solid; background: var(--brand-soft); }
 body .pk-bar { border-top: 2px solid var(--edge); }
 .opened { border: 2px solid var(--edge); box-shadow: var(--hard-s); border-radius: 8px; }
 @media (max-width: 560px) { .topbar-title { padding-left: 10px; } }
+
+/* ---------- Retro-Pastell: dezente Akzente zum ADP-Rot ---------- */
+:root {
+  --p-rose: #f2c9c4; --p-sage: #cfe0c6; --p-butter: #f4e3a6; --p-sky: #c8dbe8; --p-lilac: #dcd0e8; --p-peach: #f6d2b4; --p-sand: #e9dfca;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --p-rose: #6b3d3a; --p-sage: #3f5440; --p-butter: #5e5230; --p-sky: #34495a; --p-lilac: #4b4260; --p-peach: #6a4a32; --p-sand: #3d3630; }
+}
+:root[data-theme="dark"] { --p-rose: #6b3d3a; --p-sage: #3f5440; --p-butter: #5e5230; --p-sky: #34495a; --p-lilac: #4b4260; --p-peach: #6a4a32; --p-sand: #3d3630; }
+
+/* Titelleisten: erste Karte ADP-Rot, danach Pastell im Wechsel */
+.page > .card::before, .pk > .card::before { background-color: var(--p-sky); }
+.page > .card:nth-of-type(5n+1)::before, .pk > .card:nth-of-type(5n+1)::before { background-color: var(--bar-1); }
+.page > .card:nth-of-type(5n+2)::before, .pk > .card:nth-of-type(5n+2)::before { background-color: var(--p-butter); }
+.page > .card:nth-of-type(5n+3)::before, .pk > .card:nth-of-type(5n+3)::before { background-color: var(--p-sage); }
+.page > .card:nth-of-type(5n+4)::before, .pk > .card:nth-of-type(5n+4)::before { background-color: var(--p-lilac); }
+.page > .card:nth-of-type(5n)::before, .pk > .card:nth-of-type(5n)::before { background-color: var(--p-peach); }
+.card.flat::before { background-color: var(--p-sand) !important; }
+.docs-panel::before { background-color: var(--p-sky); }
+.confirm-box::before { background-color: var(--p-rose); }
+
+/* Personen: anwesend = Salbei, nicht da = Sand */
+.grid2 > .person::before { background-color: var(--p-sand) !important; }
+.grid2 > .person:not(.absent)::before { background-color: var(--p-sage) !important; }
+.person .avatar { border: 2px solid var(--edge); background: var(--p-rose); color: var(--ink); }
+.grid2 > .person:nth-child(4n+2) .avatar { background: var(--p-sky); }
+.grid2 > .person:nth-child(4n+3) .avatar { background: var(--p-butter); }
+.grid2 > .person:nth-child(4n) .avatar { background: var(--p-lilac); }
+
+/* Ablauf: jedes Symbol mit eigenem Pastell, aktiver Schritt in ADP-Rot */
+.step:nth-of-type(2) .ico { background: var(--p-rose); }
+.step:nth-of-type(3) .ico { background: var(--p-sky); }
+.step:nth-of-type(4) .ico { background: var(--p-butter); }
+.step:nth-of-type(5) .ico { background: var(--p-lilac); }
+.step:nth-of-type(6) .ico { background: var(--p-peach); }
+.step:nth-of-type(7) .ico { background: var(--p-sage); }
+.step.on .ico { background: var(--brand) !important; color: var(--brand-ink); }
+.step.on { background: var(--surface); }
+.stepper { background: var(--p-sand); }
+.bar > span { background: repeating-linear-gradient(90deg, var(--brand) 0 8px, var(--p-rose) 8px 10px); }
+
+/* Kopf und Knöpfe */
+#btn-docs { background: var(--p-sky); }
+#btn-fotos { background: var(--p-butter); }
+.btn.ghost { background: var(--p-sand); }
+.btn.small:not(.primary):not(.ghost):not(.danger) { background: var(--surface); }
+.seg button.on { background: var(--brand); }
+.pill { background: var(--p-sand); color: var(--ink); }
+.pill.good { background: var(--p-sage); color: var(--ink); }
+.pill.warn { background: var(--p-butter); color: var(--ink); }
+.pill.crit, .pill.brand { background: var(--p-rose); color: var(--ink); }
+
+/* Hinweise in Pastell */
+.notice { background: var(--p-butter); color: var(--ink); }
+.notice.info { background: var(--p-sky); }
+.notice.good, .opened { background: var(--p-sage); color: var(--ink); }
+.notice.brand { background: var(--p-rose); }
+.opened svg { color: var(--ink); }
+
+/* Start, Unterlagen, Fotos */
+.gz-item .gz-badge { background: var(--p-butter); color: var(--ink); }
+.gz-row:nth-child(4n+2) .gz-badge { background: var(--p-sky); }
+.gz-row:nth-child(4n+3) .gz-badge { background: var(--p-sage); }
+.gz-row:nth-child(4n) .gz-badge { background: var(--p-lilac); }
+.gz-item .pill.brand, .gz-item .pill.warn { color: var(--ink); }
+.doc-ico { background: var(--p-rose); color: var(--ink); }
+.doc-row:nth-child(3n+2) .doc-ico { background: var(--p-sky); }
+.doc-row:nth-child(3n) .doc-ico { background: var(--p-butter); }
+.docs-links .doc-open:nth-of-type(1) .doc-ico { background: var(--p-sage); }
+.docs-links .doc-open:nth-of-type(2) .doc-ico { background: var(--p-lilac); }
+.foto figcaption { background: var(--surface); }
+body .drop { background: var(--p-sand); }
+body .drop.over { background: var(--p-sky); }
+.file-chip { background: var(--p-sage); color: var(--ink); }
+.start-card .foot { background: var(--p-sand); }
