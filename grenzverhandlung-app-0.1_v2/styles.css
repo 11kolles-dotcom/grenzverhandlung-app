@@ -402,3 +402,14 @@ a.doc-open { text-decoration: none; }
 .lightbox img { max-width: 100%; max-height: 100%; object-fit: contain; }
 .lightbox .icon-btn { position: absolute; top: calc(env(safe-area-inset-top, 0px) + 12px); right: 12px; }
 @media (max-width: 560px) { .topbar .logo-chip { display: none; } }
+
+/* ---------- Löschen am Start ---------- */
+.gz-row { display: flex; gap: 8px; align-items: stretch; }
+.gz-row .gz-item { flex: 1; min-width: 0; }
+.gz-del { height: auto; width: 52px; flex: none; color: #5f5c58; background: #fff; border-color: #e0ddd8; }
+.gz-del:hover { color: #b3261e; border-color: #b3261e; }
+.confirm-dlg { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 16px; }
+.confirm-box { position: relative; width: min(460px, 100%); background: var(--surface); color: var(--ink); border-radius: 16px; padding: 20px; box-shadow: 0 20px 60px rgba(0,0,0,.3); display: flex; flex-direction: column; gap: 12px; }
+.confirm-box h2 { margin: 0; }
+.confirm-box p { margin: 0; }
+.confirm-box input { min-height: 48px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; font: 600 1.1rem var(--mono); background: var(--surface); color: var(--ink); }

@@ -468,13 +468,37 @@ VIEWS.start = async page => {
   }
   for (const v of app.list) {
     const s = STATUS[v.status], pr = progress(v);
-    list.append(h('button', { class: 'gz-item', type: 'button', onclick: () => openGz(v.id) },
+    list.append(h('div', { class: 'gz-row' }, h('button', { class: 'gz-item', type: 'button', onclick: () => openGz(v.id) },
       h('span', { class: 'gz-badge' }, icon('folder')),
       h('span', {}, h('span', { class: 'gz' }, `GZ ${v.gz}`), h('br'),
         h('span', { class: 'meta' }, `${v.meta.kg || 'KG ?'}${v.meta.gemeinde ? ' · ' + v.meta.gemeinde : ''} · ${deDate(v.meta.datum)} · ${owners(v).length} Eigentümer · ${pr.done}/${pr.total} Schritte`)),
-      h('span', { class: 'pill ' + s.cls }, s.label)));
+      h('span', { class: 'pill ' + s.cls }, s.label)),
+      h('button', { class: 'icon-btn gz-del', type: 'button', title: 'Verhandlung löschen', 'aria-label': `Verhandlung GZ ${v.gz} löschen`, onclick: () => askDelete(v) }, icon('trash'))));
   }
 };
+/* Löschen mit Sicherheitsabfrage: GZ muss eingetippt werden */
+function askDelete(v) {
+  const exported = v.log.some(e => /export/i.test(e.text));
+  const inp = h('input', { type: 'text', inputmode: 'numeric', autocomplete: 'off', placeholder: v.gz, 'aria-label': 'Geschäftszahl zur Bestätigung' });
+  const ok = h('button', { class: 'btn danger', type: 'button', disabled: true }, icon('trash'), 'Endgültig löschen');
+  const close = () => dlg.remove();
+  inp.addEventListener('input', () => { ok.disabled = inp.value.trim() !== String(v.gz).trim(); });
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter' && !ok.disabled) ok.click(); if (e.key === 'Escape') close(); });
+  ok.addEventListener('click', async () => {
+    ok.disabled = true;
+    try { await DB.del(v.id); close(); toast(`Verhandlung GZ ${v.gz} gelöscht`); setView('start'); } catch (err) { toast(err.message); ok.disabled = false; }
+  });
+  const dlg = h('div', { class: 'confirm-dlg', role: 'alertdialog', 'aria-modal': 'true', 'aria-label': 'Verhandlung löschen' },
+    h('div', { class: 'docs-backdrop', onclick: close }),
+    h('div', { class: 'confirm-box' },
+      h('h2', {}, `GZ ${v.gz} löschen?`),
+      h('p', {}, 'Die Verhandlung wird mit Skizze, Unterschriften, Fotos und Unterlagen von diesem Gerät gelöscht. Das lässt sich nicht rückgängig machen.'),
+      v.status === 'vorbereitet' || exported ? null : notice('', 'warn', h('span', {}, h('strong', {}, 'Noch nicht exportiert. '), 'Alles, was vor Ort erfasst wurde, geht verloren.')),
+      h('label', { class: 'lbl' }, `Zur Bestätigung die Geschäftszahl ${v.gz} eintippen`), inp,
+      h('div', { class: 'row', style: 'justify-content:flex-end' }, h('button', { class: 'btn ghost', type: 'button', onclick: close }, 'Abbrechen'), ok)));
+  document.body.append(dlg);
+  inp.focus();
+}
 async function openGz(id) {
   app.cur = migrate(await DB.get(id));
   app.editing = null; app.pending = null;
@@ -1046,7 +1070,7 @@ VIEWS.export = page => {
       cnt('offen') ? notice('', 'warn', h('span', {}, `${cnt('offen')} Zustimmung(en) sind noch offen.`)) : notice('good', 'check', h('span', {}, 'Alle Eigentümer sind erfasst.')),
       cnt('stift') ? notice('info', 'info', h('span', {}, `${cnt('stift')} Zustimmung(en) nur mit dem Stift: Für die Schriftform braucht es zusätzlich eine QES oder eine Unterschrift auf Papier.`)) : null,
       h('div', { class: 'row' },
-        h('button', { class: 'btn primary big', type: 'button', onclick: async e => { const b = e.currentTarget; b.disabled = true; try { download(await exportZip(v), `Grenzverhandlung_${safeName(v.gz)}_V${v.version}.zip`); } catch (err) { toast(err.message); } b.disabled = false; } }, icon('export'), 'Alles für die Kanzlei (ZIP)'),
+        h('button', { class: 'btn primary big', type: 'button', onclick: async e => { const b = e.currentTarget; b.disabled = true; try { download(await exportZip(v), `Grenzverhandlung_${safeName(v.gz)}_V${v.version}.zip`); logEvent('Paket für die Kanzlei exportiert'); touch(true); } catch (err) { toast(err.message); } b.disabled = false; } }, icon('export'), 'Alles für die Kanzlei (ZIP)'),
         h('button', { class: 'btn', type: 'button', onclick: () => download(currentPdf(), pdfFileName(v, v.signed ? 'signiert' : 'gesperrt')) }, icon('pdf'), v.signed ? 'Signiertes Protokoll' : 'Gesperrtes Protokoll'),
         hasStift(v) ? h('button', { class: 'btn', type: 'button', onclick: async e => { const b = e.currentTarget; b.disabled = true; try { download(await protocolWithSignatures(v), pdfFileName(v, 'mit_Stift-Unterschriften_Information')); } catch (err) { toast(err.message); } b.disabled = false; } }, icon('pen'), 'Protokoll mit Stift-Unterschriften') : null,
         h('button', { class: 'btn', type: 'button', onclick: () => download(new Blob([JSON.stringify(exportJson(v), null, 2)], { type: 'application/json' }), `Verhandlung_${safeName(v.gz)}_V${v.version}.json`) }, 'Verhandlungsdaten (JSON)'))));
