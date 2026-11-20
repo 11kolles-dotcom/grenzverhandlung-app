@@ -51,10 +51,11 @@
 
   <section class="card">
     <div><h2>2 · Beteiligte</h2><p class="muted" style="margin:0">Eigentümer laut Grundbuch, bekannte Vertreter. Keine Telefonnummern oder E-Mail-Adressen (DSGVO).</p></div>
+    <div class="drop" id="drop-gb"><strong>Grundbuchsabfrage hierher ziehen</strong> oder klicken<br><span style="font-size:.85rem">beide CSV-Dateien gemeinsam: Eigentümer und Grundstücke (Zuordnung über die EZ)</span></div>
     <div class="pk-scroll"><table class="pk-table" id="bet"><thead><tr><th style="width:150px">Rolle</th><th style="width:80px">EZ</th><th style="width:90px">Gst.-Nr.</th><th>Name</th><th>Anschrift</th><th>vertritt</th><th class="x"></th></tr></thead><tbody></tbody></table></div>
     <div class="row">
       <button class="btn small" type="button" id="add-bet">+ Person</button>
-      <details style="flex:1"><summary class="muted">Aus Excel einfügen</summary>
+      <details style="flex:1"><summary class="muted">Aus Excel einfügen (Zeilen kopieren)</summary>
         <p class="muted" style="margin:6px 0">Spalten EZ, Gst.-Nr., Name, Anschrift kopieren (eine Person je Zeile) und hier einfügen.</p>
         <textarea class="paste" id="paste" placeholder="1012&#9;.626&#9;Johann Steiner&#9;Kapellenweg 7, 8101 Gratkorn"></textarea>
         <button class="btn small" type="button" id="paste-go" style="margin-top:6px">Übernehmen</button>
@@ -63,7 +64,7 @@
   </section>
 
   <section class="card">
-    <div><h2>3 · GFN und andere Behelfe</h2><p class="muted" style="margin:0">Werden bei der Eröffnung angehakt und dann im Protokoll genannt.</p></div>
+    <div><h2>3 · GFN und andere Behelfe</h2><p class="muted" style="margin:0">Werden bei der Eröffnung angehakt und dann im Protokoll genannt. Die GFN aus der Grundstücksabfrage stehen schon da; die PDFs dazu hierher ziehen (Zuordnung über die Nummer im Dateinamen, z. B. 10828_2012_63.pdf) oder je Zeile wählen.</p></div>
     <div class="pk-scroll"><table class="pk-table" id="beh"><thead><tr><th>Planverfasser</th><th style="width:150px">Geschäftszahl</th><th>Anmerkung</th><th style="width:200px">PDF</th><th class="x"></th></tr></thead><tbody></tbody></table></div>
     <div class="drop" id="drop-beh"><strong>GFN-PDFs hierher ziehen</strong> oder klicken</div>
   </section>

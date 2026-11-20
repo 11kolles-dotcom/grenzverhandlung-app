@@ -52,6 +52,8 @@ const ICONS = {
   run: 'M13 4a2 2 0 100 .1M9 21l3-6 3 3v3M7 12l3-4 4 1 3 3M10 8l-1 5',
   pdf: 'M7 3h7l5 5v13H7zM14 3v5h5M9 15h6',
   pen: 'M4 20l4-1 11-11-3-3L5 16z',
+  camera: 'M4 8h3l2-3h6l2 3h3v11H4zM12 17a3.5 3.5 0 100-7 3.5 3.5 0 000 7z',
+  map: 'M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3zM9 3v15M15 6v15',
   docs: 'M8 3h8l4 4v12H8zM16 3v4h4M4 7v14h12M11 11h6M11 15h6',
   trash: 'M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13',
 };
@@ -171,6 +173,7 @@ function newVerhandlung(src) {
     beteiligte: (src.beteiligte || []).map(newPerson),
     behelfe: (src.behelfe || []).map(b => ({ id: uid(), planverfasser: b.planverfasser || '', gz: b.geschaeftszahl || '', anmerkung: b.anmerkung || '', vorgehalten: false, pdf: b.pdf, datei: b.datei || '' })),
     skizze: { pdf: src.skizzePdf || null, strokes: [], texts: [], symbols: [] },
+    fotos: [],
     unterlagen: (src.unterlagen || []).filter(u => u.pdf).map(u => ({ id: uid(), titel: u.titel || titleFromFile(u.datei), datei: u.datei || '', pdf: u.pdf, lokal: false })),
     beschreibung: { text: 'Alte Grenzpunkte wurden aufgrund oben genannter GFN (VHW´s) überprüft bzw. rückgesetzt und einvernehmlich anerkannt.\nDie neuen Grenzpunkte wurden ebenfalls einvernehmlich festgelegt und in der Natur vermarkt.', strittig: '' },
     status: 'vorbereitet', version: 1, locked: null, signed: null,
@@ -182,6 +185,7 @@ function migrate(v) {
   v.skizze.symbols = v.skizze.symbols || [];
   delete v.vorab;
   v.unterlagen = v.unterlagen || [];
+  v.fotos = v.fotos || [];
   v.meta.gemeinde = v.meta.gemeinde || '';
   v.meta.gegenstand = v.meta.gegenstand || '';
   return v;
@@ -218,7 +222,7 @@ async function importZip(file) {
     if (!f) throw new Error(`Datei ${path} fehlt im ZIP.`);
     return new Blob([await f.async('uint8array')], { type: 'application/pdf' });
   };
-  for (const b of src.behelfe || []) b.pdf = await getPdf(b.datei);
+  for (const b of src.behelfe || []) b.pdf = b.datei ? await getPdf(b.datei) : null;
   if (src.skizze) src.skizzePdf = await getPdf(src.skizze);
   src.unterlagen = Array.isArray(src.unterlagen) ? src.unterlagen : [];
   for (const u of src.unterlagen) u.pdf = await getPdf(u.datei);
@@ -399,6 +403,7 @@ function renderChrome() {
   const s = STATUS[v.status], pill = $('#topbar-status');
   pill.className = 'pill ' + s.cls; pill.textContent = s.label;
   const dc = $('#docs-count'); dc.textContent = v.unterlagen.length || ''; dc.hidden = !v.unterlagen.length;
+  const fc = $('#fotos-count'); fc.textContent = v.fotos.length || ''; fc.hidden = !v.fotos.length;
 
   const pr = progress(v);
   const nav = $('#stepper');
@@ -533,7 +538,8 @@ function behelfeVorhalten() {
           b.vorgehalten = e.target.checked; logEvent(`Behelf ${b.gz} ${b.vorgehalten ? 'vorgehalten' : 'nicht vorgehalten'}`); touch(); rerender();
         } }),
         h('span', {}, h('strong', { class: 'mono' }, b.gz || 'ohne GZ'), h('span', { class: 'muted' }, ` · ${b.planverfasser || 'Planverfasser unbekannt'}${b.anmerkung ? ' · ' + b.anmerkung : ''}`))),
-      h('button', { class: 'btn small', type: 'button', onclick: () => Viewer.open({ blob: b.pdf, title: `Behelf ${b.gz} · ${b.planverfasser}` }) }, icon('zoom'), 'Ansehen'))))
+      b.pdf ? h('button', { class: 'btn small', type: 'button', onclick: () => Viewer.open({ blob: b.pdf, title: `Behelf ${b.gz} · ${b.planverfasser}` }) }, icon('zoom'), 'Ansehen')
+        : h('span', { class: 'muted', style: 'font-size:.85rem' }, 'ohne PDF'))))
       : h('p', { class: 'muted' }, 'Keine Behelfe im Verhandlungspaket.'),
     L ? null : h('div', { style: 'margin-top:10px' },
       h('button', { class: 'btn small ghost', type: 'button', onclick: e => e.currentTarget.nextElementSibling.click() }, icon('plus'), 'GFN-Plan ergänzen (PDF)'),
@@ -615,11 +621,78 @@ function openDocs() {
         h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Schließen', onclick: closeDocs }, '✕')),
       listEl,
       h('div', { class: 'docs-foot' },
-        h('button', { class: 'btn small ghost', type: 'button', onclick: () => add.click() }, icon('plus'), 'PDF vom Gerät hinzufügen'), add)));
+        h('button', { class: 'btn small ghost', type: 'button', onclick: () => add.click() }, icon('plus'), 'PDF vom Gerät hinzufügen'), add),
+      h('div', { class: 'docs-links' },
+        h('span', { class: 'lbl' }, 'Online-Karten (brauchen Internet)'),
+        KARTEN.map(([t, sub, url]) => h('a', { class: 'doc-open', href: url, target: '_blank', rel: 'noopener' },
+          h('span', { class: 'doc-ico' }, icon('map')), h('span', { class: 'doc-txt' }, h('b', {}, t), h('small', { class: 'muted' }, sub)))))));
   document.body.append(sheet);
   sheet.querySelector('.docs-panel button').focus();
 }
 function closeDocs() { const d = $('#docs'); if (d) d.remove(); }
+const KARTEN = [
+  ['Kataster BEV', 'kataster.bev.gv.at · aktueller Kataster mit Orthofoto', 'https://kataster.bev.gv.at/#/center/13.35,47.77/zoom/7.2/ortho/1/vermv/0.6'],
+  ['GIS Steiermark', 'gis.stmk.gv.at · Basiskarten, Kataster', 'https://gis.stmk.gv.at/wgportal/atlasmobile/map/Basiskarten/Kataster'],
+];
+
+/* ---------- Fotos (nicht Teil des Protokolls) ---------- */
+async function shrinkPhoto(file, max = 2400) {
+  try {
+    const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
+    const k = Math.min(1, max / Math.max(bmp.width, bmp.height));
+    const c = document.createElement('canvas'); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+    c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+    return await new Promise(r => c.toBlob(b => r(b || file), 'image/jpeg', 0.85));
+  } catch { return file; }
+}
+function openFotos() {
+  const v = app.cur; if (!v) return;
+  closeDocs();
+  const urls = [];
+  const grid = h('div', { class: 'foto-grid' });
+  const fill = () => {
+    urls.splice(0).forEach(u => URL.revokeObjectURL(u));
+    grid.replaceChildren();
+    if (!v.fotos.length) put(grid, h('p', { class: 'muted', style: 'grid-column:1/-1;padding:8px 4px' }, 'Noch keine Fotos. Fotos gehen beim Export ins Büro mit, sind aber nicht Teil des Protokolls.'));
+    v.fotos.forEach((f, i) => {
+      const u = URL.createObjectURL(f.blob); urls.push(u);
+      put(grid, h('figure', { class: 'foto' },
+        h('button', { class: 'foto-img', type: 'button', 'aria-label': `Foto ${i + 1} groß ansehen`, onclick: () => lightbox(u) }, h('img', { src: u, alt: f.notiz || `Foto ${i + 1}` })),
+        h('figcaption', {},
+          h('span', { class: 'muted' }, `${i + 1} · ${timeOf(f.zeit)} Uhr`),
+          h('input', { type: 'text', value: f.notiz || '', placeholder: 'Notiz, z. B. Grenzstein GP 12', 'aria-label': `Notiz zu Foto ${i + 1}`, oninput: e => { f.notiz = e.target.value; touch(); } }),
+          h('button', { class: 'icon-btn', type: 'button', title: 'Foto löschen', 'aria-label': `Foto ${i + 1} löschen`, onclick: () => {
+            if (!confirm(`Foto ${i + 1} löschen?`)) return;
+            v.fotos.splice(i, 1); logEvent(`Foto ${i + 1} gelöscht`); touch(true); fill();
+          } }, icon('trash')))));
+    });
+  };
+  const takePhotos = async e => {
+    const files = [...e.target.files]; e.target.value = '';
+    for (const file of files) { v.fotos.push({ id: uid(), blob: await shrinkPhoto(file), zeit: Date.now(), notiz: '' }); }
+    if (files.length) { logEvent(`${files.length} Foto${files.length === 1 ? '' : 's'} aufgenommen`); touch(true); fill(); grid.lastElementChild?.scrollIntoView({ block: 'nearest' }); }
+  };
+  const cam = h('input', { type: 'file', accept: 'image/*', capture: 'environment', hidden: true, onchange: takePhotos });
+  const gal = h('input', { type: 'file', accept: 'image/*', multiple: true, hidden: true, onchange: takePhotos });
+  fill();
+  const close = () => { urls.forEach(u => URL.revokeObjectURL(u)); closeDocs(); };
+  const sheet = h('div', { class: 'docs-sheet', id: 'docs', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Fotos' },
+    h('div', { class: 'docs-backdrop', onclick: close }),
+    h('div', { class: 'docs-panel wide' },
+      h('div', { class: 'docs-head' },
+        h('div', {}, h('h2', {}, 'Fotos'), h('p', { class: 'muted' }, `GZ ${v.gz} · gehen mit dem Export ins Büro, nicht ins Protokoll`)),
+        h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Schließen', onclick: close }, '✕')),
+      h('div', { class: 'row' },
+        h('button', { class: 'btn primary big', type: 'button', onclick: () => cam.click() }, icon('camera'), 'Foto aufnehmen'), cam,
+        h('button', { class: 'btn small ghost', type: 'button', onclick: () => gal.click() }, 'Aus Galerie'), gal),
+      grid));
+  document.body.append(sheet);
+}
+function lightbox(url) {
+  const lb = h('div', { class: 'lightbox', role: 'dialog', 'aria-label': 'Foto', onclick: () => lb.remove() },
+    h('img', { src: url, alt: '' }), h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Schließen' }, '✕'));
+  document.body.append(lb);
+}
 
 /* ---------- 3 Begehungsskizze ---------- */
 function openSketch() {
@@ -940,15 +1013,19 @@ function exportJson(v) {
     beteiligte: v.beteiligte.map(({ id, ...b }) => ({ ...b, zustimmung: { art: b.zustimmung.art, zeit: b.zustimmung.zeit ? new Date(b.zustimmung.zeit).toISOString() : null, stiftUnterschrift: !!b.zustimmung.png } })),
     behelfe: v.behelfe.map(b => ({ planverfasser: b.planverfasser, geschaeftszahl: b.gz, anmerkung: b.anmerkung, vorgehalten: b.vorgehalten })),
     beschreibung: v.beschreibung,
+    fotos: v.fotos.map((f, i) => ({ datei: fotoName(v, f, i), zeit: new Date(f.zeit).toISOString(), notiz: f.notiz || '' })),
     skizze: { striche: v.skizze.strokes.length, texte: v.skizze.texts.length, grenzzeichen: v.skizze.symbols.map(s => s.code) },
     verlauf: v.log.map(e => ({ zeit: new Date(e.zeit).toISOString(), text: e.text })),
   };
 }
+const fotoName = (v, f, i) => `fotos/GZ${safeName(v.gz)}_Foto_${pad2(i + 1)}_${timeOf(f.zeit).replace(':', '')}.jpg`;
 async function exportZip(v) {
   const zip = new JSZip();
   zip.file(pdfFileName(v, v.signed ? 'signiert' : 'gesperrt'), await currentPdf().arrayBuffer());
   if (hasStift(v)) zip.file(pdfFileName(v, 'mit_Stift-Unterschriften_Information'), await (await protocolWithSignatures(v)).arrayBuffer());
   zip.file(`Verhandlung_${safeName(v.gz)}_V${v.version}.json`, JSON.stringify(exportJson(v), null, 2));
+  v.fotos.forEach((f, i) => zip.file(fotoName(v, f, i), f.blob));
+  if (v.fotos.length) zip.file('fotos/Fotos.txt', v.fotos.map((f, i) => `${fotoName(v, f, i).slice(6)}\t${deDateTime(f.zeit)}\t${f.notiz || ''}`).join('\r\n'));
   for (const u of v.unterlagen.filter(x => x.lokal)) zip.file(`vor_Ort_ergaenzt/${safeName(u.titel)}.pdf`, await u.pdf.arrayBuffer());
   return zip.generateAsync({ type: 'blob' });
 }
@@ -1448,7 +1525,8 @@ function init() {
   initViewer(); initNet();
   $('#btn-home').onclick = () => { if (Viewer.st) Viewer.close(); closeDocs(); app.cur = null; setView('start'); };
   $('#btn-docs').onclick = openDocs;
-  document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#docs') && !Viewer.st) closeDocs(); });
+  $('#btn-fotos').onclick = openFotos;
+  document.addEventListener('keydown', e => { if (e.key !== 'Escape' || Viewer.st) return; const lb = document.querySelector('.lightbox'); if (lb) lb.remove(); else if ($('#docs')) closeDocs(); });
   $('#btn-back').onclick = () => { const i = STEPS.findIndex(x => x.k === app.view); if (i > 0) setView(STEPS[i - 1].k); };
   $('#btn-next').onclick = () => { const i = STEPS.findIndex(x => x.k === app.view); if (i < STEPS.length - 1) setView(STEPS[i + 1].k); };
   $('#file-zip').onchange = async e => {

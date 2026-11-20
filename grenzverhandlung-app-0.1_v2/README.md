@@ -7,6 +7,9 @@ Offline-Web-App (PWA) für die Grenzverhandlung nach § 43 Abs. 6 VermG. Prototy
 - Unterlagen: Angebot, Einladungen und andere PDFs kommen im Ordner `unterlagen/` des Verhandlungspakets mit und sind in der App über den Knopf „Unterlagen“ oben jederzeit einsehbar. Vor Ort lassen sich weitere PDFs ergänzen; diese gehen beim Export mit.
 - Büro-Seite `paket.html` („Paket erstellen“): Kopfdaten, Beteiligte (auch aus Excel einfügen), GFN, Skizze und Unterlagen eintragen bzw. hineinziehen und als ZIP speichern
 - Demo enthält eine fiktive Einladung und ein fiktives Angebot
+- Grundbuchsabfrage: In „Paket erstellen“ die beiden CSV-Dateien (Eigentümer und Grundstücke) gemeinsam hineinziehen. Die Eigentümer werden mit Titel, Anschrift, EZ und Gst.-Nr. übernommen (Zuordnung über KG und EZ), die GFN aus der Grundstücksabfrage als Behelfe vorgeschlagen; GFN-PDFs werden über die Nummer im Dateinamen zugeordnet. Geburtsdaten und Anteile werden nicht übernommen.
+- Fotos: Knopf „Fotos“ oben, Aufnahme mit der Kamera des Tablets, Notiz je Foto. Die Fotos gehen beim Export im Ordner `fotos/` ins Büro, nicht ins Protokoll.
+- Links zum Kataster des BEV und zu GIS Steiermark im Bereich „Unterlagen“ (brauchen Internet)
 
 ## Ablauf mit dem Büro
 
@@ -75,7 +78,8 @@ unterlagen/Einladung.pdf
     { "titel": "Einladung zur Grenzverhandlung", "datei": "unterlagen/Einladung.pdf" }
   ],
   "behelfe": [
-    { "planverfasser": "…", "geschaeftszahl": "GFN 1958", "anmerkung": "Plan aus 1958", "datei": "behelfe/GFN_1958.pdf" }
+    { "planverfasser": "…", "geschaeftszahl": "GFN 1958", "anmerkung": "Plan aus 1958", "datei": "behelfe/GFN_1958.pdf" },
+    { "geschaeftszahl": "GFN 2775/2020/63", "anmerkung": "ohne PDF: steht trotzdem zur Auswahl" }
   ],
   "beteiligte": [
     { "ez": "1012", "gst": ".626", "name": "Johann Steiner", "anschrift": "Kapellenweg 7, 8101 Gratkorn", "rolle": "Eigentümer" },
