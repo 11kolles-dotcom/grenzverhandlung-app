@@ -5,7 +5,7 @@
  */
 'use strict';
 
-const APP_VERSION = '0.8.2';
+const APP_VERSION = '0.8.3';
 const EGIZ_URL = 'https://pdf.egiz.gv.at/';
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'libs/pdf.worker.min.js';
 
@@ -132,6 +132,7 @@ const STATUS = {
   laufend: { label: 'Verhandlung läuft', cls: 'brand' },
   gesperrt: { label: 'gesperrt, Zustimmung offen', cls: 'warn' },
   abgeschlossen: { label: 'alle Zustimmungen erfasst', cls: 'good' },
+  unterfertigt: { label: 'vom Verhandlungsleiter unterfertigt', cls: 'good' },
 };
 const ZUST = {
   offen: { label: 'Zustimmung offen', cls: '' },
@@ -213,6 +214,7 @@ function migrate(v) {
   v.meta.gemeinde = v.meta.gemeinde || '';
   if (!(v.beschreibung.text || '').includes('Der Verlauf der Grenzen wird')) v.beschreibung.text = BESCHREIBUNG_FEST + '\n\n' + (v.beschreibung.text || '').split(/\n+/).map(x => x.trim()).filter(Boolean).join('\n\n');
   v.meta.gegenstand = v.meta.gegenstand || '';
+  if (v.leiterSig === undefined) v.leiterSig = null;
   return v;
 }
 
@@ -463,7 +465,7 @@ function stepDone(k, v = app.cur) {
     case 'skizze': return inkCount(v.skizze) > 0;
     case 'beschreibung': return !!v.beschreibung.gesehen && !!(v.beschreibung.text || '').trim();
     case 'abschluss': return !!v.locked;
-    case 'zustimmung': return v.status === 'abgeschlossen';
+    case 'zustimmung': return v.status === 'abgeschlossen' || v.status === 'unterfertigt';
     default: return false;
   }
 }
@@ -591,7 +593,7 @@ function askDelete(v) {
 async function openGz(id) {
   app.cur = migrate(await DB.get(id));
   app.editing = null; app.pending = null;
-  setView(app.cur.locked ? (app.cur.status === 'abgeschlossen' ? 'export' : 'zustimmung') : 'eroeffnung');
+  setView(app.cur.locked ? (app.cur.status === 'unterfertigt' ? 'export' : 'zustimmung') : 'eroeffnung');
 }
 
 /* ---------- 1 Eröffnung und Beteiligte ---------- */
@@ -945,7 +947,7 @@ VIEWS.abschluss = page => {
       h('div', { class: 'row' },
         h('button', { class: 'btn', type: 'button', onclick: () => Viewer.open({ blob: v.locked.pdf, title: `Protokoll Version ${v.version} (gesperrt)` }) }, icon('pdf'), 'Gesperrtes Protokoll ansehen'),
         confirmButton('Neue Version anlegen', 'Bisherige Signaturen am Gesamtprotokoll verfallen. Entsperren?', false, async () => {
-          v.version += 1; v.locked = null; v.signed = null; v.status = 'laufend';
+          v.version += 1; v.locked = null; v.signed = null; v.leiterSig = null; v.status = 'laufend';
           v.beteiligte.forEach(b => { b.zustimmung = { art: 'offen', zeit: null }; });
           logEvent(`Neue Version ${v.version} angelegt, Signaturen am Gesamtprotokoll zurückgesetzt`);
           await touch(true); rerender();
@@ -972,7 +974,7 @@ VIEWS.abschluss = page => {
         const bytes = await buildProtocol(v);
         const hash = await sha256Hex(bytes);
         v.locked = { pdf: new Blob([bytes], { type: 'application/pdf' }), hash, zeit: Date.now() };
-        v.signed = null;
+        v.signed = null; v.leiterSig = null;
         updateStatus();
         logEvent(`Protokoll Version ${v.version} gesperrt, SHA-256 ${hash.slice(0, 16)}…`);
         await touch(true);
@@ -990,7 +992,7 @@ function updateStatus() {
   const v = app.cur;
   if (!v.locked) return;
   const ow = owners(v);
-  v.status = ow.length && ow.every(b => b.zustimmung.art !== 'offen') ? 'abgeschlossen' : 'gesperrt';
+  v.status = v.leiterSig ? 'unterfertigt' : ow.length && ow.every(b => b.zustimmung.art !== 'offen') ? 'abgeschlossen' : 'gesperrt';
 }
 function countSignatures(bytes) {
   const s = new TextDecoder('latin1').decode(bytes);
@@ -1007,7 +1009,7 @@ async function acceptSignedPdf(file) {
   if (!pd) return;
   const bytes = await blobBytes(file);
   if (new TextDecoder('latin1').decode(bytes.slice(0, 5)) !== '%PDF-') throw new Error('Die Datei ist kein PDF.');
-  const b = personById(pd.bid);
+  const b = pd.leiter ? null : personById(pd.bid);
   const prev = await blobBytes(currentPdf());
   const sigs = countSignatures(bytes), prevSigs = countSignatures(prev);
   if (sigs <= prevSigs) throw new Error('Im PDF ist keine neue Signatur. Bitte das signierte PDF aus dem Signaturdienst wählen.');
@@ -1015,8 +1017,8 @@ async function acceptSignedPdf(file) {
   let unchanged = bytes.length > prev.length;
   for (let i = 0; unchanged && i < prev.length; i++) if (bytes[i] !== prev[i]) unchanged = false;
   v.signed = { pdf: new Blob([bytes], { type: 'application/pdf' }), zeit: Date.now(), sigCount: sigs, inkrementell: unchanged };
-  b.zustimmung = { art: 'qes', zeit: Date.now() };
-  logEvent(`${b.name}: QES übernommen (${sigs} Signatur(en) im PDF, ${unchanged ? 'Inhalt unverändert angehängt' : 'Datei neu geschrieben, Inhalt bitte prüfen'})`);
+  if (pd.leiter) v.leiterSig = { art: 'qes', zeit: Date.now() }; else b.zustimmung = { art: 'qes', zeit: Date.now() };
+  logEvent(`${pd.leiter ? `Verhandlungsleiter ${v.meta.leiter}` : b.name}: QES übernommen (${sigs} Signatur(en) im PDF, ${unchanged ? 'Inhalt unverändert angehängt' : 'Datei neu geschrieben, Inhalt bitte prüfen'})`);
   app.pending = null;
   updateStatus();
   await touch(true);
@@ -1026,7 +1028,7 @@ async function acceptSignedPdf(file) {
 function qesPanel() {
   const v = app.cur, pd = app.pending;
   if (!pd) return null;
-  const b = personById(pd.bid);
+  const b = pd.leiter ? { name: `${v.meta.leiter || 'Verhandlungsleiter'} (Verhandlungsleiter)` } : personById(pd.bid);
   if (!b) return null;
   return h('div', { class: 'card panel stack', id: 'qes-panel' },
     h('div', { class: 'card-head', style: 'margin:0' }, h('h2', {}, `Signatur von ${b.name}`), h('span', { class: 'pill brand' }, 'läuft')),
@@ -1117,7 +1119,7 @@ async function protocolWithSignatures(v) {
 
 VIEWS.zustimmung = page => {
   const v = app.cur;
-  put(page, pageHead('Zustimmung der Eigentümer', 'Jeder Eigentümer stimmt dem gesperrten Protokoll zu.'));
+  put(page, pageHead('Zustimmung', 'Jeder Eigentümer stimmt dem gesperrten Protokoll zu. Zum Schluss unterfertigt der Verhandlungsleiter.'));
   if (!v.locked) {
     put(page, notice('', 'warn', h('strong', {}, 'Das Protokoll ist noch nicht gesperrt.'),
       h('span', {}, 'Zustimmen können die Eigentümer erst nach dem Sperren, damit alle denselben Inhalt unterschreiben.'),
@@ -1149,23 +1151,43 @@ VIEWS.zustimmung = page => {
             h('span', {}, h('span', { class: 'pill ' + z.cls }, z.label), b.zustimmung.zeit ? h('span', { class: 'muted' }, '  ' + timeOf(b.zustimmung.zeit) + ' Uhr') : null),
             sigImg)),
         h('div', { class: 'actions' },
-          b.zustimmung.art === 'offen' ? [
+          v.leiterSig ? null : b.zustimmung.art === 'offen' ? [
             h('button', { class: 'btn primary', type: 'button', disabled: !!app.pending, onclick: () => startQes({ bid: b.id }) }, 'ID Austria'),
             h('button', { class: 'btn', type: 'button', onclick: () => stiftUnterschrift(b) }, icon('pen'), 'Mit Stift'),
             h('button', { class: 'btn', type: 'button', onclick: () => mark('papier') }, 'Auf Papier'),
             h('button', { class: 'btn ghost small', type: 'button', onclick: () => mark('verweigert') }, 'verweigert'),
           ] : h('button', { class: 'btn small ghost', type: 'button', onclick: () => mark('offen') }, 'Zurücksetzen')));
     })),
+    leiterCard(),
     h('div', { class: 'row' },
       h('button', { class: 'btn', type: 'button', onclick: () => download(currentPdf(), pdfFileName(v, 'zum_Ausdrucken')) }, icon('pdf'), 'Protokoll zum Ausdrucken speichern'),
       hasStift(v) ? h('button', { class: 'btn', type: 'button', onclick: async e => { const bt = e.currentTarget; bt.disabled = true; try { Viewer.open({ blob: await protocolWithSignatures(v), title: 'Protokoll mit Stift-Unterschriften (Information)' }); } catch (err) { toast(err.message); } bt.disabled = false; } }, icon('pdf'), 'Protokoll mit Stift-Unterschriften ansehen') : null));
 };
+
+/* Verhandlungsleiter unterfertigt als Letzter: seine QES umfasst das Protokoll samt allen Signaturen davor */
+function leiterCard() {
+  const v = app.cur, ow = owners(v);
+  const offen = ow.filter(b => b.zustimmung.art === 'offen').length, sig = v.leiterSig;
+  const set = async art => { v.leiterSig = art ? { art, zeit: Date.now() } : null; logEvent(art ? `Verhandlungsleiter ${v.meta.leiter}: ${art === 'qes' ? 'QES' : 'Unterschrift auf Papier'}` : 'Unterfertigung des Verhandlungsleiters zurückgesetzt'); updateStatus(); await touch(true); rerender(); };
+  return h('div', { class: 'card owner leiter' },
+    h('div', { class: 'stack', style: 'gap:2px;min-width:0' },
+      h('span', { class: 'eyebrow' }, 'Zum Schluss'),
+      h('strong', {}, `Verhandlungsleiter: ${v.meta.leiter || '…'}`),
+      sig ? h('span', {}, h('span', { class: 'pill good' }, sig.art === 'qes' ? 'QES mit ID Austria' : 'Unterschrift auf Papier'), h('span', { class: 'muted' }, '  ' + timeOf(sig.zeit) + ' Uhr'))
+        : h('span', { class: 'muted' }, offen ? `Erst wenn alle Eigentümer erfasst sind (noch ${offen} offen).` : 'Signiert als Letzter. Die Signatur umfasst das Protokoll mit allen Signaturen davor.')),
+    h('div', { class: 'actions' },
+      sig ? (sig.art === 'papier' ? h('button', { class: 'btn small ghost', type: 'button', onclick: () => set(null) }, 'Zurücksetzen') : null) : [
+        h('button', { class: 'btn primary', type: 'button', disabled: !!app.pending || offen > 0, onclick: () => startQes({ leiter: true }) }, 'ID Austria'),
+        h('button', { class: 'btn', type: 'button', disabled: offen > 0, onclick: () => set('papier') }, 'Auf Papier'),
+      ]));
+}
 
 /* ---------- 7 Export ---------- */
 function exportJson(v) {
   return {
     app: 'Digitale Grenzverhandlung', version: APP_VERSION, gz: v.gz, meta: v.meta, protokollVersion: v.version,
     gesperrt: v.locked ? { zeit: new Date(v.locked.zeit).toISOString(), sha256: v.locked.hash } : null,
+    verhandlungsleiter: v.leiterSig ? { name: v.meta.leiter, art: v.leiterSig.art, zeit: new Date(v.leiterSig.zeit).toISOString() } : null,
     beteiligte: v.beteiligte.map(({ id, ...b }) => ({ ...b, zustimmung: { art: b.zustimmung.art, zeit: b.zustimmung.zeit ? new Date(b.zustimmung.zeit).toISOString() : null, stiftUnterschrift: !!b.zustimmung.png } })),
     behelfe: v.behelfe.map(b => ({ planverfasser: b.planverfasser, geschaeftszahl: b.gz, anmerkung: b.anmerkung, vorgehalten: b.vorgehalten })),
     beschreibung: v.beschreibung,
@@ -1198,8 +1220,11 @@ VIEWS.export = page => {
         h('tr', {}, h('th', {}, 'Protokoll'), h('td', {}, `Version ${v.version}, gesperrt ${deDateTime(v.locked.zeit)}`)),
         h('tr', {}, h('th', {}, 'SHA-256'), h('td', { class: 'hash' }, v.locked.hash)),
         h('tr', {}, h('th', {}, 'Zustimmungen'), h('td', {}, `${cnt('qes')} QES · ${cnt('papier')} Papier · ${cnt('stift')} Stift (Information) · ${cnt('verweigert')} verweigert · ${cnt('offen')} offen`)),
+        h('tr', {}, h('th', {}, 'Verhandlungsleiter'), h('td', {}, v.leiterSig ? `${v.leiterSig.art === 'qes' ? 'QES' : 'Papier'}, ${deDateTime(v.leiterSig.zeit)}` : 'offen')),
         h('tr', {}, h('th', {}, 'Signaturen im PDF'), h('td', {}, v.signed ? String(v.signed.sigCount) : '0')))),
       cnt('offen') ? notice('', 'warn', h('span', {}, `${cnt('offen')} Zustimmung(en) sind noch offen.`)) : notice('good', 'check', h('span', {}, 'Alle Eigentümer sind erfasst.')),
+      v.leiterSig ? notice('good', 'check', h('span', {}, `Verhandlungsleiter: ${v.leiterSig.art === 'qes' ? 'QES mit ID Austria' : 'Unterschrift auf Papier'} um ${timeOf(v.leiterSig.zeit)} Uhr.`))
+        : notice('', 'warn', h('span', {}, 'Der Verhandlungsleiter hat noch nicht unterfertigt (Schritt „Zustimmung“, ganz unten).')),
       cnt('stift') ? notice('info', 'info', h('span', {}, `${cnt('stift')} Zustimmung(en) nur mit dem Stift: Für die Schriftform braucht es zusätzlich eine QES oder eine Unterschrift auf Papier.`)) : null,
       h('div', { class: 'row' },
         h('button', { class: 'btn primary big', type: 'button', onclick: async e => { const b = e.currentTarget; b.disabled = true; try { download(await exportZip(v), `Grenzverhandlung_${safeName(v.gz)}_V${v.version}.zip`); logEvent('Paket für die Kanzlei exportiert'); touch(true); } catch (err) { toast(err.message); } b.disabled = false; } }, icon('export'), 'Alles für die Kanzlei (ZIP)'),

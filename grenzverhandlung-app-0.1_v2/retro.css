@@ -214,3 +214,6 @@ body .drop.over { background: var(--p-sky); }
 .person .vertreter .field { flex: 1 1 220px; margin: 0; }
 .invite-all { align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 14px; }
 .invite-all svg { width: 18px; height: 18px; }
+
+/* Verhandlungsleiter */
+.card.owner.leiter { border-style: dashed; }
