@@ -158,9 +158,12 @@ function newPerson(b = {}) {
   return {
     id: uid(), ez: b.ez || '', gst: b.gst || '', name: b.name || '', anschrift: b.anschrift || '',
     rolle: b.rolle && ROLLEN.includes(b.rolle) ? b.rolle : 'Eigentümer', vertritt: b.vertritt || '',
+    einladung: /^\d{1,2}:\d{2}$/.test(b.einladung || '') ? b.einladung.padStart(5, '0') : '',
     anwesend: false, idnachweis: '', vollmacht: '', anmerkung: '', zustimmung: { art: 'offen', zeit: null },
   };
 }
+const BESCHREIBUNG_FEST = 'Der Verlauf der Grenzen wird von den erschienenen beteiligten Eigentümern oder deren bevollmächtigten Vertretern entsprechend der untenstehenden Skizze festgelegt und im Sinne von §845 ABGB und der Vermessungsverordnung i.d.g.F. gekennzeichnet.\nDie Grenze verläuft von Grenzpunkt zu Grenzpunkt geradlinig, sofern nichts anderes angegeben ist. Die zeichnerische Darstellung erfolgt unter Verwendung des im Anhang zur Vermessungsverordnung i.d.g.F. festgelegten Zeichenschlüssels.\n\nWenn der Verlauf von Grenzabschnitten mangels Einigung der Eigentümer nicht festgelegt werden konnte, ist dies untenstehend beschrieben.';
+const BESCHREIBUNG_VORLAGE = BESCHREIBUNG_FEST + '\n\nAlte Grenzpunkte wurden aufgrund oben genannter GFN (VHW´s) überprüft bzw. rückgesetzt und einvernehmlich anerkannt.\n\nDie neuen Grenzpunkte wurden ebenfalls einvernehmlich festgelegt und in der Natur vermarkt.';
 function newVerhandlung(src) {
   return {
     id: uid(),
@@ -175,7 +178,7 @@ function newVerhandlung(src) {
     skizze: { pdf: src.skizzePdf || null, strokes: [], texts: [], symbols: [] },
     fotos: [],
     unterlagen: (src.unterlagen || []).filter(u => u.pdf).map(u => ({ id: uid(), titel: u.titel || titleFromFile(u.datei), datei: u.datei || '', pdf: u.pdf, lokal: false })),
-    beschreibung: { text: 'Alte Grenzpunkte wurden aufgrund oben genannter GFN (VHW´s) überprüft bzw. rückgesetzt und einvernehmlich anerkannt.\nDie neuen Grenzpunkte wurden ebenfalls einvernehmlich festgelegt und in der Natur vermarkt.', strittig: '' },
+    beschreibung: { text: BESCHREIBUNG_VORLAGE, strittig: '' },
     status: 'vorbereitet', version: 1, locked: null, signed: null,
     log: [{ zeit: Date.now(), text: 'Verhandlungspaket importiert' }],
     created: Date.now(), updated: Date.now(),
@@ -185,8 +188,10 @@ function migrate(v) {
   v.skizze.symbols = v.skizze.symbols || [];
   delete v.vorab;
   v.unterlagen = v.unterlagen || [];
+  v.beteiligte.forEach(b => { if (b.einladung === undefined) b.einladung = ''; });
   v.fotos = v.fotos || [];
   v.meta.gemeinde = v.meta.gemeinde || '';
+  if (!(v.beschreibung.text || '').includes('Der Verlauf der Grenzen wird')) v.beschreibung.text = BESCHREIBUNG_FEST + '\n\n' + (v.beschreibung.text || '').split(/\n+/).map(x => x.trim()).filter(Boolean).join('\n\n');
   v.meta.gegenstand = v.meta.gegenstand || '';
   return v;
 }
@@ -249,14 +254,14 @@ function demoSource() {
       { planverfasser: 'Archiv (Planverfasser lt. Plankopf)', geschaeftszahl: 'GFN 1958', anmerkung: 'Plan aus 1958, Grundlage für die Wiederherstellung', datei: 'behelfe/GFN_1958.pdf' },
     ],
     beteiligte: [
-      { ez: '1012', gst: '.626', name: 'Johann Steiner', anschrift: 'Kapellenweg 7, 8101 Gratkorn', rolle: 'Eigentümer' },
-      { ez: '1012', gst: '.626', name: 'Maria Steiner', anschrift: 'Kapellenweg 7, 8101 Gratkorn', rolle: 'Eigentümer' },
-      { ez: '988', gst: '.627', name: 'Elisabeth Pichler', anschrift: 'Kapellenweg 9, 8101 Gratkorn', rolle: 'Eigentümer' },
-      { ez: '540', gst: '784/5', name: 'Franz Hofer', anschrift: 'Dorfstraße 12, 8101 Gratkorn', rolle: 'Eigentümer' },
-      { ez: '536', gst: '783/15', name: 'Christine Weber', anschrift: 'Kapellenweg 3, 8101 Gratkorn', rolle: 'Eigentümer' },
-      { ez: '975', gst: '.625', name: 'Karl Wolf', anschrift: 'Kapellenweg 5, 8101 Gratkorn', rolle: 'Eigentümer' },
-      { ez: '50000', gst: '823', name: 'Marktgemeinde Gratkorn (öffentliches Gut)', anschrift: 'Gemeindeamt, 8101 Gratkorn', rolle: 'Eigentümer' },
-      { name: 'Ing. Peter Lang', anschrift: 'Gemeindeamt, 8101 Gratkorn', rolle: 'Vertreter', vertritt: 'Marktgemeinde Gratkorn' },
+      { ez: '1012', gst: '.626', name: 'Johann Steiner', einladung: '09:00', anschrift: 'Kapellenweg 7, 8101 Gratkorn', rolle: 'Eigentümer' },
+      { ez: '1012', gst: '.626', name: 'Maria Steiner', einladung: '09:00', anschrift: 'Kapellenweg 7, 8101 Gratkorn', rolle: 'Eigentümer' },
+      { ez: '988', gst: '.627', name: 'Elisabeth Pichler', einladung: '09:00', anschrift: 'Kapellenweg 9, 8101 Gratkorn', rolle: 'Eigentümer' },
+      { ez: '540', gst: '784/5', name: 'Franz Hofer', einladung: '09:30', anschrift: 'Dorfstraße 12, 8101 Gratkorn', rolle: 'Eigentümer' },
+      { ez: '536', gst: '783/15', name: 'Christine Weber', einladung: '09:30', anschrift: 'Kapellenweg 3, 8101 Gratkorn', rolle: 'Eigentümer' },
+      { ez: '975', gst: '.625', name: 'Karl Wolf', einladung: '10:00', anschrift: 'Kapellenweg 5, 8101 Gratkorn', rolle: 'Eigentümer' },
+      { ez: '50000', gst: '823', name: 'Marktgemeinde Gratkorn (öffentliches Gut)', einladung: '10:00', anschrift: 'Gemeindeamt, 8101 Gratkorn', rolle: 'Eigentümer' },
+      { name: 'Ing. Peter Lang', einladung: '10:00', anschrift: 'Gemeindeamt, 8101 Gratkorn', rolle: 'Vertreter', vertritt: 'Marktgemeinde Gratkorn' },
     ],
   };
 }
@@ -515,9 +520,9 @@ function personCard(b) {
   const editing = app.editing === b.id;
   card = h('div', { class: 'card person' + (b.anwesend ? '' : ' absent') },
     h('div', { class: 'who' },
-      h('span', { class: 'avatar' + (isOwner ? '' : ' rep'), 'aria-hidden': 'true' }, initials(b.name)),
       h('div', { style: 'min-width:0;flex:1' },
-        h('div', { class: 'name' }, b.name || 'ohne Namen'),
+        h('div', { class: 'name-row' }, h('span', { class: 'name' }, b.name || 'ohne Namen'),
+          b.einladung ? h('span', { class: 'pill invite', title: 'Uhrzeit laut Einladung' }, icon('clock'), `eingeladen ${b.einladung} Uhr`) : null),
         h('div', { class: 'sub' }, [b.rolle === 'Vertreter' && b.vertritt ? `Vertreter für ${b.vertritt}` : b.rolle,
           b.ez && `EZ ${b.ez}`, b.gst && `Gst. ${b.gst}`].filter(Boolean).join(' · ')),
         h('div', { class: 'sub' }, b.anschrift)),
@@ -536,6 +541,7 @@ function personCard(b) {
         field('Anschrift', b.anschrift, val => { b.anschrift = val; touch(); }),
         field('EZ', b.ez, val => { b.ez = val; touch(); }),
         field('Gst.Nr.', b.gst, val => { b.gst = val; touch(); }),
+        field('Eingeladen um', b.einladung || '', val => { b.einladung = val; touch(); }, { type: 'time' }),
         h('div', { class: 'field' }, h('label', {}, 'Rolle'),
           h('select', { onchange: e => { b.rolle = e.target.value; re(); } }, ROLLEN.map(r => h('option', { value: r, selected: r === b.rolle ? 'selected' : null }, r)))),
         b.rolle === 'Vertreter'
@@ -750,8 +756,6 @@ VIEWS.skizze = page => {
 
 /* ---------- 4 Grenzverlauf ---------- */
 const TB = [
-  'Alte Grenzpunkte wurden aufgrund oben genannter GFN (VHW´s) überprüft bzw. rückgesetzt und einvernehmlich anerkannt.',
-  'Die neuen Grenzpunkte wurden ebenfalls einvernehmlich festgelegt und in der Natur vermarkt.',
   'Die Grenze verläuft entlang der Mauerflucht (Außenkante).',
   'Die Grenze verläuft in Zaunmitte.',
   'Die Grenze verläuft entlang der Gartenmauer, Mauer gehört zu Gst. …',
@@ -759,19 +763,22 @@ const TB = [
 VIEWS.beschreibung = page => {
   const v = app.cur, L = isLocked();
   if (!v.beschreibung.gesehen) { v.beschreibung.gesehen = true; touch(); }
-  const ta = h('textarea', { id: 'f-beschr', disabled: L, placeholder: 'z. B. Die Grenze zwischen .626 und .627 verläuft von GP 4321 bis GP 4325 in Zaunmitte.', oninput: e => { v.beschreibung.text = e.target.value; touch(); } });
+  const grow = el => { el.style.height = 'auto'; el.style.height = (el.scrollHeight + 4) + 'px'; };
+  const ta = h('textarea', { id: 'f-beschr', disabled: L, style: 'min-height:200px;overflow:hidden', placeholder: 'z. B. Die Grenze zwischen .626 und .627 verläuft von GP 4321 bis GP 4325 in Zaunmitte.', oninput: e => { v.beschreibung.text = e.target.value; grow(e.target); touch(); } });
   ta.value = v.beschreibung.text;
+  requestAnimationFrame(() => grow(ta));
   const ta2 = h('textarea', { id: 'f-strittig', disabled: L, style: 'min-height:90px', placeholder: 'leer lassen, wenn alle Abschnitte einvernehmlich festgelegt wurden', oninput: e => { v.beschreibung.strittig = e.target.value; touch(); } });
   ta2.value = v.beschreibung.strittig;
   put(page, 
     lockedBanner(),
-    pageHead('Beschreibung des Grenzverlaufs', 'Der feste Text der Vorlage (Festlegung nach § 845 ABGB, Zeichenschlüssel der VermV) steht automatisch im Protokoll. Hier kommt dazu, was diese Verhandlung betrifft. Das ergibt Seite 2.'),
+    pageHead('Beschreibung des Grenzverlaufs', 'Der Text steht genau so im Protokoll (Seite 2). Eine Leerzeile beginnt einen neuen Absatz. Strittige Abschnitte unten eintragen.'),
     h('div', { class: 'card stack' },
-      h('div', { class: 'field' }, h('label', { for: 'f-beschr' }, 'Ergänzende Beschreibung'), ta),
+      h('div', { class: 'field' }, h('label', { for: 'f-beschr' }, 'Beschreibung des Grenzverlaufs'), ta),
+      L ? null : h('div', {}, h('button', { class: 'btn small ghost', type: 'button', onclick: () => { v.beschreibung.text = BESCHREIBUNG_VORLAGE; ta.value = v.beschreibung.text; grow(ta); touch(); toast('Text der Vorlage wiederhergestellt'); } }, 'Text der Vorlage wiederherstellen')),
       h('div', { class: 'stack', style: 'gap:8px' }, h('span', { class: 'lbl' }, 'Textbausteine antippen zum Einfügen'),
         h('div', { class: 'row' }, TB.map(t => h('button', { class: 'btn small', type: 'button', disabled: L, title: t, onclick: () => {
           if ((v.beschreibung.text || '').includes(t)) { toast('Dieser Textbaustein steht schon in der Beschreibung.'); return; }
-          v.beschreibung.text = (v.beschreibung.text ? v.beschreibung.text.trimEnd() + '\n' : '') + t; ta.value = v.beschreibung.text; touch();
+          v.beschreibung.text = (v.beschreibung.text ? v.beschreibung.text.trimEnd() + '\n' : '') + t; ta.value = v.beschreibung.text; grow(ta); touch();
         } }, icon('plus'), t.length > 44 ? t.slice(0, 42) + '…' : t))))),
     h('div', { class: 'card stack' },
       h('div', { class: 'field' }, h('label', { for: 'f-strittig' }, 'Nicht einvernehmlich festgelegte Grenzabschnitte'), ta2),
@@ -1010,7 +1017,6 @@ VIEWS.zustimmung = page => {
       }
       return h('div', { class: 'card owner' },
         h('div', { class: 'who', style: 'display:flex;gap:14px;align-items:center;min-width:0' },
-          h('span', { class: 'avatar' }, initials(b.name)),
           h('div', { class: 'stack', style: 'gap:2px;min-width:0' },
             h('strong', {}, b.name || 'ohne Namen'),
             h('span', { class: 'muted' }, `EZ ${b.ez || '–'} · Gst. ${b.gst || '–'} · ${b.anwesend ? 'anwesend' : 'nicht anwesend'}`),
@@ -1219,14 +1225,16 @@ async function buildProtocol(v, opts = {}) {
   newPage();
   y = H - 157;
   centered('Beschreibung des Grenzverlaufs', 12, FB, 0.6);
-  para('Der Verlauf der Grenzen wird von den erschienenen beteiligten Eigentümern oder deren bevollmächtigten Vertretern entsprechend der untenstehenden Skizze festgelegt und im Sinne von §845 ABGB und der Vermessungsverordnung i.d.g.F. gekennzeichnet.', { justify: true, gap: 0 });
-  para('Die Grenze verläuft von Grenzpunkt zu Grenzpunkt geradlinig, sofern nichts anderes angegeben ist. Die zeichnerische Darstellung erfolgt unter Verwendung des im Anhang zur Vermessungsverordnung i.d.g.F. festgelegten Zeichenschlüssels.', { justify: true, gap: 12 });
-  para('Wenn der Verlauf von Grenzabschnitten mangels Einigung der Eigentümer nicht festgelegt werden konnte, ist dies untenstehend beschrieben.', { justify: true, gap: 12 });
-  if ((v.beschreibung.strittig || '').trim()) {
-    para('Nicht festgelegte Grenzabschnitte:', { font: FB, gap: 2 });
-    para(v.beschreibung.strittig, { gap: 12 });
+  // Text aus dem Feld: Leerzeile = neuer Absatz, einfacher Umbruch = neue Zeile im Absatz.
+  // Strittige Abschnitte folgen auf den Satz „… untenstehend beschrieben.“ (wie in der Vorlage), sonst am Ende.
+  const strittig = () => { if ((v.beschreibung.strittig || '').trim()) { para('Nicht festgelegte Grenzabschnitte:', { font: FB, gap: 2 }); para(v.beschreibung.strittig, { gap: 12 }); } };
+  let strittigDone = false;
+  for (const block of (v.beschreibung.text || '').split(/\n\s*\n/).map(x => x.trim()).filter(Boolean)) {
+    const lines = block.split('\n').map(x => x.trim()).filter(Boolean);
+    lines.forEach((ln, i) => para(ln, { justify: true, gap: i === lines.length - 1 ? 12 : 0 }));
+    if (!strittigDone && /untenstehend beschrieben/.test(block)) { strittig(); strittigDone = true; }
   }
-  for (const p of (v.beschreibung.text || '').split(/\n+/).map(s => s.trim()).filter(Boolean)) para(p, { justify: true, gap: 12 });
+  if (!strittigDone) strittig();
   y -= 8;
   centered('Skizze', 12, FB, 0.2);
   centered('siehe Beilage', 10, F);
