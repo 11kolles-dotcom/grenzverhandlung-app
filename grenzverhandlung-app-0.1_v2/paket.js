@@ -207,6 +207,102 @@ dropzone($('#drop-unt'), true, fs => {
   el.ondragleave = () => el.classList.remove('over');
   el.ondrop = e => { e.preventDefault(); el.classList.remove('over'); take([...e.dataTransfer.files]); };
 })();
+/* Protokoll der Kanzlei (Word-PDF) einlesen: Kopf und Zustimmungstabelle */
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'libs/pdf.worker.min.js';
+// Wörter zusammensetzen: Leerzeichen nur, wo im PDF wirklich eine Lücke ist (Word trennt z. B. Bindestriche ab)
+function joinItems(items) {
+  let t = '', prev = null;
+  for (const it of items) { t += (prev && it.x - (prev.x + prev.w) > 1.2 && !/\s$/.test(t) && !/^\s/.test(it.s) ? ' ' : '') + it.s; prev = it; }
+  return t.replace(/\s+/g, ' ').trim();
+}
+async function pageLines(page) {
+  const tc = await page.getTextContent();
+  const items = tc.items.filter(i => i.str && i.str.trim()).map(i => ({ x: i.transform[4], y: i.transform[5], w: i.width || 0, s: i.str }));
+  const lines = [];
+  for (const it of items.sort((a, b) => b.y - a.y || a.x - b.x)) {
+    const l = lines.find(l => Math.abs(l.y - it.y) < 2.5);
+    if (l) l.items.push(it); else lines.push({ y: it.y, items: [it] });
+  }
+  lines.forEach(l => { l.items.sort((a, b) => a.x - b.x); l.text = joinItems(l.items); });
+  return lines.sort((a, b) => b.y - a.y);
+}
+const after = (text, label, stop) => {
+  const m = text.match(new RegExp(label + '\\s*:?\\s*(.+?)' + (stop ? '\\s*(?:' + stop + '|$)' : '$'), 'i'));
+  return m ? m[1].trim() : '';
+};
+async function readProtocol(file) {
+  const doc = await pdfjsLib.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+  const out = { kopf: {}, people: [] };
+  for (let n = 1; n <= doc.numPages; n++) {
+    const lines = await pageLines(await doc.getPage(n));
+    for (const l of lines) {
+      if (/^Vermessungsamt/i.test(l.text) && !out.kopf.vermessungsamt) out.kopf.vermessungsamt = after(l.text, 'Vermessungsamt', 'Seite');
+      if (/^Katastralgemeinde/i.test(l.text) && !out.kopf.katastralgemeinde) out.kopf.katastralgemeinde = after(l.text, 'Katastralgemeinde', 'Projekt');
+      if (/Projekt\s*:/i.test(l.text) && !out.kopf.gz) out.kopf.gz = after(l.text, 'Projekt');
+      const ort = l.text.match(/^([^,.…]{2,}?),\s*am\b/);
+      if (ort && !/Verhandlung/i.test(ort[1])) out.kopf.ort = ort[1].trim();
+    }
+    // Zustimmungstabelle: Spalten über die Kopfzeile (EZ, Gst.Nr., Name und Anschrift, Unterschrift, Anmerkung)
+    const hi = lines.findIndex(l => /\bEZ\b/.test(l.text) && /Gst/i.test(l.text) && /Name/i.test(l.text));
+    if (hi < 0) continue;
+    const hx = re => { const it = lines[hi].items.find(i => re.test(i.s)); return it ? it.x : null; };
+    const xGst = hx(/Gst/i), xName = hx(/Name/i), xUnt = hx(/Unterschrift/i) ?? 1e9, xAnm = hx(/Anmerkung/i) ?? 1e9;
+    if (xGst == null || xName == null) continue;
+    const cut = [xGst - 25, xName - 25, xUnt - 25, xAnm - 25];
+    const col = x => cut.findIndex(c => x < c) === -1 ? 4 : cut.findIndex(c => x < c);
+    let rec = null;
+    const flush = () => { if (rec && rec.name.length) out.people.push(rec); rec = null; };
+    for (const l of lines.slice(hi + 1)) {
+      if (/^\*?\s*ID\s*=|^V\.i\.A\.|Verhandlung über den Verlauf|^Die Verhandlung/i.test(l.text)) break;
+      if (/^des Eigentümers$/i.test(l.text)) continue;
+      const c = [[], [], [], [], []];
+      for (const it of l.items) c[col(it.x)].push(it);
+      const [ez, gst, nm, , anm] = c.map(joinItems);
+      const hasPlz = rec && rec.name.some(t => /^(A-)?\d{4,5}\s+\S/.test(t));
+      if (ez || (nm && hasPlz && !ez && !gst)) { flush(); rec = { ez, gst: [], name: [], anm: [] }; }
+      if (!rec) continue;
+      if (gst) rec.gst.push(...gst.split(/[,;]\s*|\s+/).filter(Boolean));
+      if (nm) rec.name.push(nm);
+      if (anm) rec.anm.push(anm);
+    }
+    flush();
+  }
+  out.people = out.people.map(r => {
+    const t = r.name, pi = t.findIndex(x => /^(A-)?\d{4,5}\s+\S/.test(x));
+    let name, adr;
+    if (pi >= 1) { const st = pi >= 2 ? pi - 1 : pi; name = t.slice(0, st).join(' '); adr = t.slice(st).join(', '); }
+    else { name = t[0]; adr = t.slice(1).join(', '); }
+    if (!name) { name = t.join(' '); adr = ''; }
+    return { rolle: 'Eigentümer', ez: r.ez, gst: r.gst.join(', '), name: name.replace(/\s+/g, ' ').trim(), anschrift: adr, vertritt: '' };
+  });
+  return out;
+}
+(() => {
+  const el = $('#drop-prot');
+  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'application/pdf'; inp.hidden = true; el.after(inp);
+  const take = async f => {
+    if (!isPdf(f)) { toast('Bitte das Protokoll als PDF.'); return; }
+    try {
+      const r = await readProtocol(f);
+      if (!r.people.length && !r.kopf.gz) { toast('Im PDF wurde kein Protokoll erkannt (gescannt? Dann bitte das PDF aus Word speichern).'); return; }
+      for (const [k, val] of Object.entries(r.kopf)) if (val) { state.kopf[k] = val; const i = $('#k-' + k); if (i) i.value = val; }
+      if (r.people.length) {
+        state.bet = state.bet.filter(b => b.rolle !== 'Eigentümer' && b.name.trim()).concat(r.people);
+        state.bet.sort((a, b) => (a.rolle === 'Eigentümer' ? 0 : 1) - (b.rolle === 'Eigentümer' ? 0 : 1));
+      }
+      if (!state.unt.some(u => u.file === f)) { state.unt.push({ titel: 'Vorbereitetes Protokoll (Papier)', file: f }); drawUnt(); }
+      drawBet(); check();
+      el.innerHTML = ''; const chip = document.createElement('span'); chip.className = 'file-chip'; chip.textContent = '✓ ' + f.name;
+      const hint = document.createElement('span'); hint.textContent = `  · ${r.people.length} Eigentümer, GZ ${r.kopf.gz || '?'} übernommen`; el.append(chip, hint);
+      toast(`${r.people.length} Eigentümer aus dem Protokoll übernommen. Bitte kurz prüfen.`);
+    } catch (e) { toast('Protokoll konnte nicht gelesen werden: ' + e.message); }
+  };
+  el.onclick = () => inp.click();
+  inp.onchange = () => { if (inp.files[0]) take(inp.files[0]); inp.value = ''; };
+  el.ondragover = e => { e.preventDefault(); el.classList.add('over'); };
+  el.ondragleave = () => el.classList.remove('over');
+  el.ondrop = e => { e.preventDefault(); el.classList.remove('over'); if (e.dataTransfer.files[0]) take(e.dataTransfer.files[0]); };
+})();
 window.addEventListener('dragover', e => e.preventDefault());
 window.addEventListener('drop', e => e.preventDefault());
 
