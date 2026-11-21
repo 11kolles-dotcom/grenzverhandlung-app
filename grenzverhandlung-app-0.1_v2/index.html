@@ -55,6 +55,7 @@
       <span id="v-pageinfo">1 / 1</span>
       <button id="v-next" type="button" class="btn icon" aria-label="Nächste Seite">›</button>
     </div>
+    <button id="v-searchbtn" type="button" class="btn" aria-expanded="false" title="Text im PDF suchen">🔍 Suchen</button>
     <div class="v-zoom">
       <button id="v-zoomout" type="button" class="btn icon" aria-label="Verkleinern">−</button>
       <span id="v-zoomlabel">100 %</span>
@@ -62,6 +63,13 @@
       <button id="v-fit" type="button" class="btn">Ganzes Blatt</button>
     </div>
   </div>
+  <form id="v-search" class="viewer-search" hidden role="search">
+    <input id="v-q" type="search" placeholder="Text suchen, z. B. Name, Gst.Nr., Uhrzeit" aria-label="Text im PDF suchen" autocomplete="off">
+    <button type="submit" class="btn primary">Suchen</button>
+    <button id="v-sprev" type="button" class="btn icon" aria-label="Vorheriger Treffer" disabled>‹</button>
+    <span id="v-shits" class="muted" aria-live="polite"></span>
+    <button id="v-snext" type="button" class="btn icon" aria-label="Nächster Treffer" disabled>›</button>
+  </form>
   <div id="v-tools" class="viewer-tools" hidden>
     <div class="seg big" role="group" aria-label="Werkzeug">
       <button type="button" data-tool="pen" class="on" title="Stift: freihand zeichnen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l4-1 11-11-3-3L5 16z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Stift</span></button>
@@ -101,6 +109,7 @@
 <script src="libs/pdf.min.js"></script>
 <script src="libs/pdf-lib.min.js"></script>
 <script src="libs/jszip.min.js"></script>
+<script src="libs/qrcode.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

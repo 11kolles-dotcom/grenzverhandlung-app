@@ -457,3 +457,13 @@ a.doc-open { text-decoration: none; }
 /* scharfer Ausschnitt bei starkem Zoom */
 #v-detail { pointer-events: none; }
 #v-detail[hidden] { display: none; }
+
+/* Signaturprüfung */
+.sig-check { display: inline-flex; gap: 6px; align-items: center; font-size: .85rem; color: var(--good); font-weight: 600; }
+.sig-check svg { width: 14px; height: 14px; }
+.sig-check.warn { color: var(--crit); }
+.sig-list { margin: 0; padding-left: 20px; font-size: .9rem; }
+.viewer-search { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 12px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.viewer-search[hidden] { display: none; }
+.viewer-search input { flex: 1 1 220px; min-width: 0; max-width: 460px; }
+#v-shits { min-width: 70px; text-align: center; font-size: .9rem; }

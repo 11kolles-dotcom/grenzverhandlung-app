@@ -217,3 +217,35 @@ body .drop.over { background: var(--p-sky); }
 
 /* Verhandlungsleiter */
 .card.owner.leiter { border-style: dashed; }
+
+/* 0.9: Statusfarben – grün = erledigt, rot = offen, grau = gesperrt; immer mit Symbol (✓ / !) */
+.stepper .step.open .ico { background: var(--crit-soft) !important; }
+.stepper .step.done .ico { background: var(--good-soft) !important; }
+.stepper .step.gated .ico { background: var(--surface-2) !important; }
+.stepper .step.on .ico { background: var(--brand) !important; }
+.step .tick { display: grid !important; left: 34px; top: 4px; width: 18px; height: 18px; font-size: 11px; }
+.step.done .tick { background: var(--good); color: #fff; }
+.step.open .tick { background: var(--crit); color: #fff; }
+.step.gated .tick { display: none !important; }
+.stmark { display: inline-grid; place-items: center; width: 20px; height: 20px; margin-right: 6px; border-radius: 50%; border: 2px solid var(--edge); font-size: 12px; font-weight: 800; vertical-align: 2px; flex: none; }
+.stmark.ok { background: var(--good); color: #fff; }
+.stmark.open { background: var(--crit); color: #fff; }
+.stmark.off { background: var(--surface-2); color: var(--muted); }
+.grid2 > .person.st-ok::before { background-color: var(--p-sage) !important; }
+.grid2 > .person.st-open::before { background-color: var(--p-rose) !important; }
+.grid2 > .person.st-off::before { background-color: var(--surface-2) !important; }
+.card.owner.st-ok { border-left: 8px solid var(--good) !important; }
+.card.owner.st-open { border-left: 8px solid var(--crit) !important; }
+/* Eröffnungstext zum Vorlesen */
+.card.vorlesen summary { cursor: pointer; list-style: none; }
+.card.vorlesen summary::-webkit-details-marker { display: none; }
+.card.vorlesen summary::after { content: ' ▾'; color: var(--muted); }
+.card.vorlesen[open] summary::after { content: ' ▴'; }
+.vorlesen-text { margin-top: 10px; font-size: 1.12rem; line-height: 1.6; max-width: 68ch; }
+.vorlesen-text p { margin: 0 0 10px; }
+/* Fotos von Vollmacht und Papier-Unterschrift */
+.vm-thumb { padding: 0; border: 2px solid var(--edge); border-radius: 6px; overflow: hidden; width: 56px; height: 56px; background: var(--surface); cursor: zoom-in; }
+.vm-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.docs-sec { margin: 14px 4px 4px; font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.card.owner.st-ok::before { background-color: var(--p-sage) !important; }
+.card.owner.st-open::before { background-color: var(--p-rose) !important; }
