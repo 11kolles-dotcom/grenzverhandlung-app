@@ -5,7 +5,7 @@
  */
 'use strict';
 
-const APP_VERSION = '0.9.2';
+const APP_VERSION = '0.9.3';
 const EGIZ_URL = 'https://pdf.egiz.gv.at/';
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'libs/pdf.worker.min.js';
 
@@ -537,6 +537,7 @@ function renderChrome() {
 const VIEWS = {};
 function setView(view) {
   app.view = view;
+  if (view !== 'start') armBack();
   const main = $('#main');
   main.replaceChildren();
   renderChrome();
@@ -1353,6 +1354,7 @@ function signaturePad(b) {
           h('div', {}, h('span', { class: 'eyebrow' }, 'Unterschrift mit dem Stift'), h('h2', {}, b.name)),
           h('button', { class: 'btn ghost', type: 'button', onclick: () => close(null) }, 'Abbrechen')),
         h('p', { class: 'muted' }, 'Hiermit stimme ich dem festgelegten und beschriebenen Grenzverlauf zu. Die Stift-Unterschrift wird ins Protokoll übernommen; sie dient nur der Information und ersetzt die qualifizierte Signatur (ID Austria) bzw. die Unterschrift auf Papier nicht.'),
+        h('p', { class: 'quer-tipp' }, 'Tipp: Gerät quer halten, dann ist mehr Platz zum Unterschreiben.'),
         h('div', { class: 'sigpad-area' }, cv, h('span', { class: 'sigpad-line' }), h('span', { class: 'sigpad-x' }, '✕')),
         h('div', { class: 'row', style: 'justify-content:space-between' },
           h('button', { class: 'btn', type: 'button', onclick: () => { strokes = []; redraw(); } }, 'Löschen'),
@@ -2304,6 +2306,30 @@ function init() {
     navigator.serviceWorker.register('sw.js').then(r => r.update()).catch(() => {});
   }
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+  initBack();
   setView('start');
+}
+/* Zurück-Taste bzw. Zurück-Geste (Android): schließt zuerst Fenster und Ansichten, geht dann einen Schritt zurück.
+   Erst auf der Startseite verlässt ein weiteres Zurück die App. */
+const armBack = () => { try { if (!history.state || !history.state.gv) history.pushState({ gv: 1 }, ''); } catch (_) {} };
+function initBack() {
+  const arm = armBack;
+  history.replaceState({ gv: 0 }, '');
+  arm();
+  window.addEventListener('popstate', () => {
+    const q = sel => document.querySelector(sel);
+    let handled = true;
+    if (q('.lightbox')) q('.lightbox').remove();
+    else if (q('.sigpad')) [...q('.sigpad').querySelectorAll('button')].find(b => b.textContent.trim() === 'Abbrechen')?.click();
+    else if (q('.confirm-dlg')) q('.confirm-dlg').remove();
+    else if (Viewer.st) Viewer.close();
+    else if ($('#docs')) closeDocs();
+    else if (app.view !== 'start' && app.cur) {
+      const i = STEPS.findIndex(x => x.k === app.view);
+      if (i > 0) setView(STEPS[i - 1].k); else { app.cur = null; setView('start'); }
+    } else handled = false;
+    if (handled) arm();
+  });
+  document.addEventListener('click', arm, true);
 }
 init();
