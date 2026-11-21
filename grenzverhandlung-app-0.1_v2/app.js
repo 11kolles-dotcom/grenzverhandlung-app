@@ -5,7 +5,7 @@
  */
 'use strict';
 
-const APP_VERSION = '0.9.14';
+const APP_VERSION = '0.9.15';
 const EGIZ_URL = 'https://pdf.egiz.gv.at/';
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'libs/pdf.worker.min.js';
 
@@ -964,12 +964,25 @@ VIEWS.skizze = page => {
   const up = h('input', { type: 'file', accept: 'application/pdf', hidden: true, onchange: async e => {
     const f = e.target.files[0]; if (!f) return;
     v.skizze = { pdf: f, strokes: [], texts: [], symbols: [], rev: (v.skizze.rev || 0) + 1 };
+    if (v.fotos.some(x => x.pos)) toast('Die Foto-Standorte wurden zurückgesetzt, bitte neu verorten.');
     v.fotos.forEach(x => { delete x.pos; });
     logEvent(`Begehungsskizze ersetzt (${f.name})`); touch(true); rerender();
   } });
+  const blatt = async n => {
+    try {
+      v.skizze = { ...v.skizze, pdf: await leeresBlatt(v, n), leer: n };
+      if (n === 1) { v.skizze.strokes = []; v.skizze.texts = []; v.skizze.symbols = []; v.skizze.rev = (v.skizze.rev || 0) + 1; }
+      else v.skizze.rev = (v.skizze.rev || 0) + 1;
+      logEvent(n === 1 ? 'Handskizze auf leerem Blatt angelegt' : `Handskizze: Blatt ${n} angefügt`); touch(true);
+      if (n === 1) openSketch(); else { rerender(); toast(`Blatt ${n} angefügt. In der Skizze zum Blättern nach unten wischen.`); }
+    } catch (e) { toast('Leeres Blatt konnte nicht angelegt werden: ' + e.message); }
+  };
   if (!v.skizze.pdf) {
-    put(page, pageHead('Begehungsskizze'), h('div', { class: 'card stack' }, h('p', {}, 'Im Verhandlungspaket ist keine Begehungsskizze.'),
-      h('div', {}, h('button', { class: 'btn primary', type: 'button', onclick: () => up.click() }, 'Skizze laden (PDF)'), up)));
+    put(page, pageHead('Begehungsskizze', 'Im Verhandlungspaket ist keine Begehungsskizze.'), h('div', { class: 'card stack' },
+      h('p', { style: 'margin:0' }, 'Zeichne die Situation als Handskizze auf einem leeren Blatt (A4 quer, mit feinem Raster). Sie kommt wie sonst als Beilage ins Protokoll, Fotos lassen sich darauf verorten.'),
+      h('div', { class: 'row' },
+        h('button', { class: 'btn primary', type: 'button', onclick: () => blatt(1) }, icon('pen'), 'Auf leerem Blatt zeichnen'),
+        h('button', { class: 'btn ghost', type: 'button', onclick: () => up.click() }, 'Skizze laden (PDF)'), up)));
     return;
   }
   const img = h('img', { alt: 'Begehungsskizze mit Ergänzungen' });
@@ -982,7 +995,9 @@ VIEWS.skizze = page => {
       h('span', { class: 'sketch-cta' }, icon('pen'), L ? 'Ansehen' : 'Tippen zum Zeichnen')),
     h('div', { class: 'row', style: 'justify-content:space-between' },
       h('span', { class: 'muted' }, n ? `${n} Ergänzung${n === 1 ? '' : 'en'} eingezeichnet` : 'Noch nichts eingezeichnet'),
-      L ? null : h('span', {}, h('button', { class: 'btn small ghost', type: 'button', onclick: () => up.click() }, 'Andere Skizze laden'), up)));
+      L ? null : h('span', { class: 'row', style: 'gap:6px' },
+        v.skizze.leer ? h('button', { class: 'btn small ghost', type: 'button', onclick: () => blatt(v.skizze.leer + 1) }, '+ Leeres Blatt') : null,
+        h('button', { class: 'btn small ghost', type: 'button', onclick: () => up.click() }, v.skizze.leer ? 'Doch PDF-Skizze laden' : 'Andere Skizze laden'), up)));
 };
 
 /* ---------- 4 Grenzverlauf ---------- */
@@ -1561,6 +1576,24 @@ async function getLogoBytes() {
 
 /* Protokoll nach der Vorlage der Kanzlei (3 Seiten A4, Skizze als Beilage).
  * opts.unterschriften: Stift-Unterschriften in die Spalte „Unterschrift“ übernehmen (nur Information). */
+/* Leeres Blatt für eine Handskizze, wenn es keine Begehungsskizze gibt: A4 quer, feines 5-mm-Punktraster, Kopfzeile */
+async function leeresBlatt(v, seiten = 1) {
+  const { PDFDocument, StandardFonts, rgb } = PDFLib;
+  const doc = await PDFDocument.create(), F = await doc.embedFont(StandardFonts.Helvetica);
+  doc.setTitle(`Handskizze ${v.gz}`); doc.setProducer(`Digitale Grenzverhandlung ${APP_VERSION} (Prototyp)`);
+  const W = 841.89, H = 595.28, mm = 72 / 25.4, rand = 10 * mm, dot = rgb(0.78, 0.78, 0.78);
+  for (let n = 1; n <= seiten; n++) {
+    const p = doc.addPage([W, H]);
+    for (let x = rand; x <= W - rand + 0.1; x += 5 * mm) for (let y = rand; y <= H - rand - 8 * mm + 0.1; y += 5 * mm)
+      p.drawCircle({ x, y, size: 0.45, color: dot });
+    p.drawRectangle({ x: rand, y: rand, width: W - 2 * rand, height: H - 2 * rand - 8 * mm + 0.5 * mm, borderColor: rgb(0.6, 0.6, 0.6), borderWidth: 0.6 });
+    const kopf = ansi(`Handskizze vor Ort · Projekt ${v.gz}${v.meta && v.meta.kg ? ` · KG ${v.meta.kg}` : (v.katastralgemeinde ? ` · KG ${v.katastralgemeinde}` : '')}${seiten > 1 ? ` · Blatt ${n} von ${seiten}` : ''}`);
+    p.drawText(kopf, { x: rand, y: H - rand - 4 * mm, size: 10, font: F, color: rgb(0.25, 0.25, 0.25) });
+    p.drawText(ansi('Nicht maßstäblich'), { x: W - rand - F.widthOfTextAtSize('Nicht maßstäblich', 8), y: H - rand - 4 * mm, size: 8, font: F, color: rgb(0.45, 0.45, 0.45) });
+  }
+  return new Blob([await doc.save()], { type: 'application/pdf' });
+}
+
 /* Ergänzungen vor Ort auf eine kopierte Seite der Begehungsskizze zeichnen (Protokoll-Beilage und Fotoplan) */
 function drawSketchInk(p, v, idx, FB) {
   const { LineCapStyle } = PDFLib;
@@ -1851,7 +1884,7 @@ async function buildProtocol(v, opts = {}) {
       doc.addPage(p); pages.push(p);
       drawSketchInk(p, v, idx, FB);
       const mb = p.getMediaBox();
-      const label = ansi(`Beilage zum Protokoll, Projekt ${v.gz}: Begehungsskizze mit Ergänzungen vor Ort${copied.length > 1 ? ` (Blatt ${idx + 1} von ${copied.length})` : ''}`);
+      const label = ansi(`Beilage zum Protokoll, Projekt ${v.gz}: ${v.skizze.leer ? 'Handskizze vor Ort' : 'Begehungsskizze mit Ergänzungen vor Ort'}${copied.length > 1 ? ` (Blatt ${idx + 1} von ${copied.length})` : ''}`);
       p.drawRectangle({ x: mb.x + 8, y: mb.y + 6, width: F.widthOfTextAtSize(label, 8) + 8, height: 13, color: rgb(1, 1, 1), opacity: 0.85 });
       p.drawText(label, { x: mb.x + 12, y: mb.y + 9.5, size: 8, font: F, color: grey });
     });
