@@ -5,7 +5,7 @@
  */
 'use strict';
 
-const APP_VERSION = '0.9.6';
+const APP_VERSION = '0.9.7';
 const EGIZ_URL = 'https://pdf.egiz.gv.at/';
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'libs/pdf.worker.min.js';
 
@@ -79,7 +79,7 @@ const initials = name => String(name || '?').replace(/\(.*?\)/g, '').split(/\s+/
 let toastTimer;
 function toast(msg) {
   const t = $('#toast'); t.textContent = msg; t.hidden = false;
-  clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 3400);
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, Math.max(3400, String(msg).length * 65));
   t.onclick = () => { t.hidden = true; };
 }
 function download(blob, name) {
@@ -345,7 +345,12 @@ async function demoFiles() {
     angebot: await fetchBlob('demo/Angebot_GZ19389.pdf', 'application/pdf'),
   };
 }
+/* Je Geschäftszahl darf nur eine Verhandlung auf dem Gerät sein */
+const gzKey = gz => String(gz || '').replace(/\s+/g, '').toLowerCase();
+async function findGz(gz) { return (await DB.all()).find(x => gzKey(x.gz) === gzKey(gz)) || null; }
 async function createDemo() {
+  const da = await findGz(demoSource().gz);
+  if (da) { da.schonDa = true; return da; }
   const f = await demoFiles();
   const src = demoSource();
   src.skizzePdf = f.skizze; src.behelfe[0].pdf = f.gfn; src.unterlagen[0].pdf = f.einladung; src.unterlagen[1].pdf = f.angebot;
@@ -574,7 +579,7 @@ VIEWS.start = async page => {
       list,
       h('div', { class: 'foot' },
         h('button', { class: 'btn primary', type: 'button', onclick: () => $('#file-zip').click() }, icon('upload'), 'Verhandlungspaket importieren'),
-        h('button', { class: 'btn', type: 'button', onclick: e => busy(e.currentTarget, async () => { const v = await createDemo(); toast('Demo-Verhandlung angelegt'); openGz(v.id); }) }, icon('plus'), 'Demo anlegen'))),
+        h('button', { class: 'btn', type: 'button', onclick: e => busy(e.currentTarget, async () => { const v = await createDemo(); toast(v.schonDa ? `Demo GZ ${v.gz} ist schon vorhanden und wurde geöffnet` : 'Demo-Verhandlung angelegt'); delete v.schonDa; openGz(v.id); }) }, icon('plus'), 'Demo anlegen'))),
     h('details', {},
       h('summary', {}, 'Wie kommt eine Verhandlung aufs Gerät?'),
       h('div', { class: 'card stack' },
@@ -2288,7 +2293,11 @@ function init() {
   $('#btn-next').onclick = () => { const i = STEPS.findIndex(x => x.k === app.view); if (i < STEPS.length - 1) setView(STEPS[i + 1].k); };
   $('#file-zip').onchange = async e => {
     const f = e.target.files[0]; e.target.value = ''; if (!f) return;
-    try { const v = await importZip(f); await DB.put(v); toast(`Verhandlung ${v.gz} importiert`); openGz(v.id); }
+    try {
+      const v = await importZip(f), da = await findGz(v.gz);
+      if (da) { toast(`GZ ${da.gz} ist schon auf diesem Gerät, es wurde nichts überschrieben. Zum neu Laden die bestehende Verhandlung zuerst löschen.`); openGz(da.id); return; }
+      await DB.put(v); toast(`Verhandlung ${v.gz} importiert`); openGz(v.id);
+    }
     catch (err) { toast('Import fehlgeschlagen: ' + err.message); }
   };
   $('#file-signed').onchange = async e => {
