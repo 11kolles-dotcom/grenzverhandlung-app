@@ -5,7 +5,7 @@
  */
 'use strict';
 
-const APP_VERSION = '0.9.8';
+const APP_VERSION = '0.9.9';
 const EGIZ_URL = 'https://pdf.egiz.gv.at/';
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'libs/pdf.worker.min.js';
 
@@ -210,6 +210,8 @@ function migrate(v) {
     if (b.vertreten === undefined) b.vertreten = false;
     if (b.abwesend === undefined) b.abwesend = false;
     if (!b.vertreter) b.vertreter = { name: '', idnachweis: '', vollmacht: '' };
+    // bis 0.9.8 war „Stift“ eine Zustimmungsart; jetzt ist es eine Zusatz-Information neben QES bzw. Papier
+    if (b.zustimmung && b.zustimmung.art === 'stift') { b.stift = b.zustimmung.png ? { png: b.zustimmung.png, zeit: b.zustimmung.zeit } : null; b.zustimmung = { art: 'offen', zeit: null }; }
   });
   v.fotos = v.fotos || [];
   v.meta.gemeinde = v.meta.gemeinde || '';
@@ -1212,7 +1214,7 @@ const sigSeite = v => v.meta.sigSeite !== false;
 function currentPdf() { const v = app.cur; return v.signed ? v.signed.pdf : v.locked.pdf; }
 function pdfFileName(v, suffix) { return `Protokoll_${safeName(v.gz)}_V${v.version}_${suffix}.pdf`; }
 const personById = id => app.cur.beteiligte.find(x => x.id === id);
-const hasStift = v => owners(v).some(b => b.zustimmung.art === 'stift' && b.zustimmung.png);
+const hasStift = v => owners(v).some(b => b.stift && b.stift.png);
 function updateStatus() {
   const v = app.cur;
   if (!v.locked) return;
@@ -1368,7 +1370,7 @@ function signaturePad(b) {
 async function stiftUnterschrift(b) {
   const png = await signaturePad(b);
   if (!png) return;
-  b.zustimmung = { art: 'stift', zeit: Date.now(), png };
+  b.stift = { png, zeit: Date.now() };
   thumbCache.delete('sig-' + b.id);
   logEvent(`${b.name}: Unterschrift mit dem Stift (nur Information)`);
   updateStatus(); await touch(true); rerender();
@@ -1393,15 +1395,17 @@ VIEWS.zustimmung = page => {
       h('div', { class: 'card-head', style: 'margin:0' }, h('h2', {}, `${done} von ${ow.length} Eigentümern`),
         h('span', { class: 'pill ' + (done === ow.length ? 'good' : 'warn') }, done === ow.length ? 'vollständig' : 'offen')),
       h('div', { class: 'bar' }, h('span', { style: `width:${ow.length ? Math.round(done / ow.length * 100) : 0}%` })),
-      h('p', { class: 'muted' }, 'ID Austria ist die rechtsgültige digitale Unterschrift. „Mit Stift“ kommt ins Protokoll, gilt aber nur als Information.')),
+      h('p', { class: 'muted' }, 'Rechtsgültig zustimmen: mit ID Austria oder auf Papier. Die Stift-Unterschrift geht zusätzlich und kommt nur als Information in eine eigene Fassung des Protokolls.')),
     qesPanel(),
     h('div', { class: 'stack' }, ow.map(b => {
       const z = ZUST[b.zustimmung.art];
       const mark = async art => { b.zustimmung = { art, zeit: Date.now() }; logEvent(`${b.name}: ${ZUST[art].label}`); updateStatus(); await touch(true); rerender(); };
       let sigImg = null;
-      if (b.zustimmung.art === 'stift' && b.zustimmung.png) {
-        sigImg = h('img', { class: 'sig-thumb', alt: `Unterschrift ${b.name}` });
-        sigImg.src = URL.createObjectURL(b.zustimmung.png);
+      if (b.stift && b.stift.png) {
+        sigImg = h('span', { class: 'stift-info' }, h('img', { class: 'sig-thumb', alt: `Stift-Unterschrift ${b.name}` }),
+          h('span', { class: 'muted' }, `Stift-Unterschrift ${timeOf(b.stift.zeit)} Uhr · nur Information`),
+          v.leiterSig ? null : h('button', { class: 'btn small ghost', type: 'button', onclick: async () => { b.stift = null; logEvent(`${b.name}: Stift-Unterschrift entfernt`); await touch(true); rerender(); } }, 'Entfernen'));
+        sigImg.firstChild.src = URL.createObjectURL(b.stift.png);
       }
       const zOk = b.zustimmung.art !== 'offen';
       return h('div', { class: 'card owner ' + (zOk ? 'st-ok' : 'st-open') },
@@ -1412,14 +1416,17 @@ VIEWS.zustimmung = page => {
             h('span', {}, h('span', { class: 'pill ' + z.cls }, z.label), b.zustimmung.zeit ? h('span', { class: 'muted' }, '  ' + timeOf(b.zustimmung.zeit) + ' Uhr') : null),
             sigZeile(b.zustimmung.sig),
             sigImg,
-            b.zustimmung.art === 'papier' ? papierFotoZeile(b) : null)),
+            b.zustimmung.art === 'papier' ? papierFotoZeile(b) : null,
+            b.stift && !zOk ? h('span', { class: 'stift-hinweis' }, 'Rechtsgültig fehlt noch: ID Austria oder Unterschrift auf Papier.') : null)),
         h('div', { class: 'actions' },
           v.leiterSig ? null : b.zustimmung.art === 'offen' ? [
             h('button', { class: 'btn primary', type: 'button', disabled: !!app.pending, onclick: () => startQes({ bid: b.id }) }, 'ID Austria'),
-            h('button', { class: 'btn', type: 'button', onclick: () => stiftUnterschrift(b) }, icon('pen'), 'Mit Stift'),
             h('button', { class: 'btn', type: 'button', onclick: () => mark('papier') }, 'Auf Papier'),
+            b.stift ? null : h('button', { class: 'btn', type: 'button', onclick: () => stiftUnterschrift(b) }, icon('pen'), 'Mit Stift (Info)'),
             h('button', { class: 'btn ghost small', type: 'button', onclick: () => mark('verweigert') }, 'verweigert'),
-          ] : h('button', { class: 'btn small ghost', type: 'button', onclick: () => mark('offen') }, 'Zurücksetzen')));
+          ] : [
+            b.stift || b.zustimmung.art === 'verweigert' ? null : h('button', { class: 'btn small', type: 'button', onclick: () => stiftUnterschrift(b) }, icon('pen'), 'Zusätzlich mit Stift'),
+            h('button', { class: 'btn small ghost', type: 'button', onclick: () => mark('offen') }, 'Zurücksetzen')]));
     })),
     leiterCard(),
     h('div', { class: 'row' },
@@ -1471,7 +1478,7 @@ function exportJson(v) {
     signaturen: v.signed && v.signed.pruefung ? v.signed.pruefung.map(x => ({ ...x, zeit: x.zeit ? new Date(x.zeit).toISOString() : null })) : [],
     beteiligte: v.beteiligte.map(({ id, vollmachtFoto, ...b }) => ({ ...b, vollmachtFoto: !!vollmachtFoto,
       vertreter: b.vertreter ? { ...b.vertreter, vollmachtFoto: !!b.vertreter.vollmachtFoto } : b.vertreter,
-      zustimmung: { art: b.zustimmung.art, zeit: b.zustimmung.zeit ? new Date(b.zustimmung.zeit).toISOString() : null, stiftUnterschrift: !!b.zustimmung.png,
+      zustimmung: { art: b.zustimmung.art, zeit: b.zustimmung.zeit ? new Date(b.zustimmung.zeit).toISOString() : null, stiftUnterschrift: !!(b.stift && b.stift.png),
         fotoPapier: b.zustimmung.foto ? (b.zustimmung.fotoImPdf ? 'Beilage im Protokoll' : nachName(v, b)) : null } })),
     behelfe: v.behelfe.map(b => ({ planverfasser: b.planverfasser, geschaeftszahl: b.gz, anmerkung: b.anmerkung, vorgehalten: b.vorgehalten })),
     beschreibung: v.beschreibung,
@@ -1497,7 +1504,7 @@ async function exportZip(v) {
 }
 VIEWS.export = page => {
   const v = app.cur, ow = owners(v);
-  const cnt = art => ow.filter(b => b.zustimmung.art === art).length;
+  const cnt = art => ow.filter(b => b.zustimmung.art === art).length, nStift = ow.filter(b => b.stift && b.stift.png).length;
   put(page, pageHead('Export für Beurkundung und BAIK-Archiv', 'In der Kanzlei werden Papier-Zustimmungen eingescannt, die Beurkundungssignatur angebracht und das Protokoll ins Archiv geladen.'));
   if (!v.locked) {
     put(page, notice('', 'warn', h('strong', {}, 'Noch nichts zu exportieren.'), h('span', {}, 'Das Protokoll ist noch nicht gesperrt.'),
@@ -1507,7 +1514,7 @@ VIEWS.export = page => {
       h('table', { class: 'kv' }, h('tbody', {},
         h('tr', {}, h('th', {}, 'Protokoll'), h('td', {}, `Version ${v.version}, gesperrt ${deDateTime(v.locked.zeit)}`)),
         h('tr', {}, h('th', {}, 'SHA-256'), h('td', { class: 'hash' }, v.locked.hash)),
-        h('tr', {}, h('th', {}, 'Zustimmungen'), h('td', {}, `${cnt('qes')} QES · ${cnt('papier')} Papier · ${cnt('stift')} Stift (Information) · ${cnt('verweigert')} verweigert · ${cnt('offen')} offen`)),
+        h('tr', {}, h('th', {}, 'Zustimmungen'), h('td', {}, `${cnt('qes')} QES · ${cnt('papier')} Papier · ${cnt('verweigert')} verweigert · ${cnt('offen')} offen${nStift ? ` · zusätzlich ${nStift} mit Stift (Information)` : ''}`)),
         h('tr', {}, h('th', {}, 'Verhandlungsleiter'), h('td', {}, v.leiterSig ? `${v.leiterSig.art === 'qes' ? 'QES' : 'Papier'}, ${deDateTime(v.leiterSig.zeit)}` : 'offen')),
         h('tr', {}, h('th', {}, 'Signaturen im PDF'), h('td', {}, v.signed ? String(v.signed.sigCount) : '0')))),
       v.signed && v.signed.pruefung ? h('div', { class: 'stack', style: 'gap:6px' }, h('strong', {}, 'Signaturen im Protokoll (in der App geprüft)'),
@@ -1517,7 +1524,6 @@ VIEWS.export = page => {
       cnt('offen') ? notice('', 'warn', h('span', {}, `${cnt('offen')} Zustimmung(en) sind noch offen.`)) : notice('good', 'check', h('span', {}, 'Alle Eigentümer sind erfasst.')),
       v.leiterSig ? notice('good', 'check', h('span', {}, `Verhandlungsleiter: ${v.leiterSig.art === 'qes' ? 'QES mit ID Austria' : 'Unterschrift auf Papier'} um ${timeOf(v.leiterSig.zeit)} Uhr.`))
         : notice('', 'warn', h('span', {}, 'Der Verhandlungsleiter hat noch nicht unterfertigt (Schritt „Zustimmung“, ganz unten).')),
-      cnt('stift') ? notice('info', 'info', h('span', {}, `${cnt('stift')} Zustimmung(en) nur mit dem Stift: Für die Schriftform braucht es zusätzlich eine QES oder eine Unterschrift auf Papier.`)) : null,
       h('div', { class: 'row' },
         h('button', { class: 'btn primary big', type: 'button', onclick: async e => { const b = e.currentTarget; b.disabled = true; try { download(await exportZip(v), `Grenzverhandlung_${safeName(v.gz)}_V${v.version}.zip`); logEvent('Paket für die Kanzlei exportiert'); touch(true); } catch (err) { toast(err.message); } b.disabled = false; } }, icon('export'), 'Alles für die Kanzlei (ZIP)'),
         h('button', { class: 'btn', type: 'button', onclick: async () => { await papierInsPdf(v).catch(err => toast(err.message)); download(currentPdf(), pdfFileName(v, v.signed ? 'signiert' : 'gesperrt')); } }, icon('pdf'), v.signed ? 'Signiertes Protokoll' : 'Gesperrtes Protokoll'),
@@ -1783,11 +1789,11 @@ async function buildProtocol(v, opts = {}) {
   para('Weiters bestätigen die Eigentümer gem. § 43 Abs. 6 VermG und § 52 Z 5 VermG, dass der Grenzverlauf seit der letzten Vermessung unverändert geblieben ist, bzw. kein anderer Grenzverlauf bekannt ist.', { justify: true, gap: 16 });
   const ow = owners(v);
   const imgs = new Map();
-  if (opts.unterschriften) for (const b of ow) if (b.zustimmung.art === 'stift' && b.zustimmung.png) imgs.set(b.id, await doc.embedPng(await blobBytes(b.zustimmung.png)));
+  if (opts.unterschriften) for (const b of ow) if (b.stift && b.stift.png) imgs.set(b.id, await doc.embedPng(await blobBytes(b.stift.png)));
   const cellSig = b => {
     if (!opts.unterschriften) return '';
     const z = b.zustimmung.art;
-    if (z === 'stift' && imgs.has(b.id)) return { text: '', img: imgs.get(b.id) };
+    if (imgs.has(b.id)) return { text: '', img: imgs.get(b.id) };
     return { qes: 'QES (ID Austria)', papier: 'Unterschrift auf Papier', verweigert: 'verweigert', offen: '' }[z] || '';
   };
   // Vertreter und Vollmacht beim vertretenen Eigentümer vermerken (die Tabelle der Anwesenden entfällt laut Vorlage)
@@ -1795,7 +1801,7 @@ async function buildProtocol(v, opts = {}) {
   const vertreterVon = b => [b.vertreten && !b.anwesend && b.vertreter.name.trim() ? vtext(b.vertreter) : '',
     ...v.beteiligte.filter(x => x.rolle === 'Vertreter' && x.anwesend && x.vertritt && b.name.toLowerCase().includes(x.vertritt.toLowerCase())).map(vtext)].filter(Boolean).join('; ');
   const rows = ow.map(b => [b.ez, b.gst.split(/,\s*/).join('\n'), `${b.name}\n${b.anschrift.split(/,\s*/).join('\n')}`, cellSig(b),
-    [b.anwesend && b.idnachweis && `ID: ${b.idnachweis}`, present(b) ? '' : 'nicht anwesend', vertreterVon(b), opts.unterschriften && b.zustimmung.art === 'stift' ? 'Stift, nur Information' : '', b.anmerkung].filter(Boolean).join(', ')]);
+    [b.anwesend && b.idnachweis && `ID: ${b.idnachweis}`, present(b) ? '' : 'nicht anwesend', vertreterVon(b), opts.unterschriften && imgs.has(b.id) ? `Stift, nur Information${{ qes: '; rechtsgültig: QES (ID Austria)', papier: '; rechtsgültig: auf Papier', verweigert: '; Zustimmung verweigert' }[b.zustimmung.art] || '; rechtsgültige Zustimmung offen'}` : '', b.anmerkung].filter(Boolean).join(', ')]);
   if (!rows.length) rows.push(['', '', '', '', '']);
   table([{ t: 'EZ', w: 0.095 }, { t: 'Gst.Nr.', w: 0.152 }, { t: 'Name und Anschrift\ndes Eigentümers', w: 0.303 }, { t: 'Unterschrift', w: 0.284 }, { t: 'Anmerkung', w: 0.166 }],
     rows, { size: 8.5, minRow: 46, headH: 36, headSize: 8.5, gapHead: 3, x0: M + 5, x1: W - M + 8 });

@@ -352,3 +352,8 @@ summary { padding: 8px 0; }
 .opener-text { flex: 1 1 100%; border-top: 1.5px dashed var(--line, #c9bfa9); padding-top: 14px; font-size: 1.08rem; line-height: 1.6; max-width: 72ch; }
 .opener-text p { margin: 0 0 8px; }
 .opener-text p:last-child { margin-bottom: 0; }
+
+/* 0.9.9: Stift-Unterschrift als Zusatz neben ID Austria bzw. Papier */
+.stift-info { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 4px; }
+.stift-info .sig-thumb { margin: 0; }
+.stift-hinweis { display: inline-block; margin-top: 4px; font-size: .88rem; font-weight: 600; color: var(--brand, #9b1b22); }
