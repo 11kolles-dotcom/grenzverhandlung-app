@@ -339,3 +339,11 @@ summary { padding: 8px 0; }
 .foto-grid { flex: none !important; overflow: visible !important; grid-auto-rows: max-content; }
 .foto { overflow: visible; }
 .foto .foto-img { border-radius: 8px 8px 0 0; overflow: hidden; }
+
+/* 0.9.5: Bereiche farblich trennen – Ablauf links dezent pastellblau, Hauptbereich warmes Creme */
+:root { --side: #dbe7ee; --side-line: #b9cbd6; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --side: #222b31; --side-line: #33414a; } }
+:root[data-theme="dark"] { --side: #222b31; --side-line: #33414a; }
+.stepper { background: var(--side) !important; }
+.stepper .step:not(.on):hover { background: color-mix(in srgb, var(--side) 70%, #fff); }
+.stepper .progress .bar { background: var(--surface); }
