@@ -5,7 +5,7 @@
  */
 'use strict';
 
-const APP_VERSION = '0.9.4';
+const APP_VERSION = '0.9.6';
 const EGIZ_URL = 'https://pdf.egiz.gv.at/';
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'libs/pdf.worker.min.js';
 
@@ -736,7 +736,7 @@ function behelfeVorhalten() {
         logEvent(`Behelf ${f.name} ergänzt`); touch(true); rerender();
       } })));
 }
-/* Eröffnungstext wie im Protokoll (Seite 1): steht auch auf der Startseite der Verhandlung zum Vorlesen */
+/* Eröffnungstext wie im Protokoll (Seite 1): steht auch in der Eröffnungskarte */
 function eroeffnungsText(v) {
   const ortKurz = (v.meta.ort || '').split(',')[0].trim();
   return [`Die Verhandlung über den Grenzverlauf wird am ${deDate(v.meta.datum) || '……………'} um ${v.meta.eroeffnung || '. . . . . . . .'} Uhr in ${ortKurz || '…'} eröffnet. Der Verhandlungsleiter überzeugt sich von der Persönlichkeit der anwesenden Personen und prüft die Vertretungsbefugnis.`,
@@ -763,8 +763,8 @@ VIEWS.eroeffnung = page => {
       h('div', { class: 'opener-action' },
         m.eroeffnung
           ? h('div', { class: 'opened' }, icon('check'), h('div', {}, h('strong', {}, `Eröffnet um ${m.eroeffnung} Uhr`), h('span', { class: 'muted' }, `${anw} von ${v.beteiligte.length} anwesend`)))
-          : h('button', { class: 'btn primary big', type: 'button', disabled: L, onclick: open }, icon('clock'), 'Verhandlung eröffnen'))),
-    eroeffnungKarte(v),
+          : h('button', { class: 'btn primary big', type: 'button', disabled: L, onclick: open }, icon('clock'), 'Verhandlung eröffnen')),
+      eroeffnungKarte(v)),
     h('details', { class: 'card flat kopf' },
       h('summary', {}, 'Kopfdaten ändern'),
       h('div', { class: 'form-grid', style: 'margin-top:14px' },
@@ -787,14 +787,10 @@ VIEWS.eroeffnung = page => {
 
 function eroeffnungKarte(v) {
   const [a, b] = eroeffnungsText(v), gfn = v.behelfe.filter(x => x.vorgehalten);
-  const open = !!v.meta.eroeffnung;
-  return h('details', { class: 'card vorlesen', open: open ? null : 'open' },
-    h('summary', {}, h('span', { class: 'eyebrow' }, 'Zum Vorlesen'), h('strong', {}, ' Eröffnungstext wie im Protokoll')),
-    h('div', { class: 'vorlesen-text' },
-      h('p', {}, a),
-      h('p', {}, b),
-      h('p', { class: 'muted' }, gfn.length ? gfn.map(x => `${x.gz}${x.planverfasser ? ` (${x.planverfasser})` : ''}`).join(' · ') : 'Behelfe unten anhaken, sobald sie vorgehalten wurden.')),
-    open ? null : h('p', { class: 'muted', style: 'margin:6px 0 0;font-size:.85rem' }, 'Die Uhrzeit wird beim Eröffnen eingesetzt.'));
+  return h('div', { class: 'opener-text' },
+    h('p', {}, a),
+    h('p', {}, b),
+    h('p', { class: 'muted' }, gfn.length ? gfn.map(x => `${x.gz}${x.planverfasser ? ` (${x.planverfasser})` : ''}`).join(' · ') : 'Behelfe unten anhaken, sobald sie vorgehalten wurden.'));
 }
 /* Personen ohne Einladungszeit: eine Zeit für alle setzen (z. B. wenn das Paket keine Zeiten enthielt) */
 function einladungFehlt() {
