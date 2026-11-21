@@ -172,15 +172,14 @@ window.addEventListener('drop', e => e.preventDefault());
 function problems() {
   const p = [];
   if (!state.prot) p.push('Protokoll einlesen');
-  if (!state.skizze) p.push('Begehungsskizze fehlt');
   return p;
 }
 function check() {
   const p = problems(), st = $('#status');
   $('#st-prot').classList.toggle('done', !!state.prot);
   $('#st-gfn').classList.toggle('done', state.beh.length > 0);
-  $('#st-unt').classList.toggle('done', !!state.skizze);
-  const parts = [state.prot ? `GZ ${state.kopf.gz} · ${state.bet.length} Eigentümer` : '', `${state.beh.length} GFN`, state.skizze ? 'Skizze' : '', `${state.unt.length} Unterlagen`].filter(Boolean);
+  $('#st-unt').classList.toggle('done', !!state.skizze || state.unt.length > 1);
+  const parts = [state.prot ? `GZ ${state.kopf.gz} · ${state.bet.length} Eigentümer` : '', `${state.beh.length} GFN`, state.skizze ? 'Skizze' : 'ohne Skizze (am Tablet leeres Blatt)', `${state.unt.length} Unterlagen`].filter(Boolean);
   st.className = p.length ? 'pk-err' : 'muted';
   st.textContent = p.length ? 'Noch offen: ' + p.join(' · ') : parts.join(' · ');
   $('#save').disabled = !state.prot;
@@ -193,7 +192,6 @@ function uniq(dir, name, used) {
 }
 $('#save').onclick = async () => {
   if (!state.prot) { toast('Zuerst das Protokoll einlesen.'); return; }
-  if (!state.skizze && !confirmNoSketch()) return;
   const btn = $('#save'); btn.disabled = true;
   try {
     const zip = new JSZip(), used = new Set();
@@ -223,12 +221,6 @@ $('#save').onclick = async () => {
   } catch (e) { toast('Fehler: ' + e.message); }
   btn.disabled = false;
 };
-// Ohne Skizze nur nach zweitem Klick speichern (kein Browser-Dialog)
-let skWarn = 0;
-function confirmNoSketch() {
-  if (Date.now() - skWarn < 6000) return true;
-  skWarn = Date.now(); toast('Keine Begehungsskizze dabei. Nochmal auf „Paket speichern“ klicken, um trotzdem zu speichern.'); return false;
-}
 $('#neu').onclick = () => location.reload();
 check();
 
