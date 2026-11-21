@@ -12,7 +12,11 @@
 <link rel="stylesheet" href="../grenzverhandlung-app-0.1_v2/styles.css">
 <link rel="stylesheet" href="../grenzverhandlung-app-0.1_v2/retro.css">
 <style>
-  body { background: var(--bg); }
+  body { background: #241c16 url(../grenzverhandlung-app-0.1_v2/assets/hintergrund.jpg) center / cover no-repeat fixed; }
+  body::before { content: ""; position: fixed; inset: 0; height: auto; z-index: 0; pointer-events: none; background: linear-gradient(180deg, rgba(20,16,14,.55), rgba(20,16,14,.82)); -webkit-backdrop-filter: blur(2.5px); backdrop-filter: blur(2.5px); }
+  .pk { position: relative; z-index: 1; }
+  .pk-head { background: var(--surface); border: 2px solid var(--edge); box-shadow: var(--hard); border-radius: var(--radius); padding: 14px 18px; }
+  .pk > p.muted { color: rgba(255,255,255,.88); }
   .pk { max-width: 980px; margin: 0 auto; padding: 24px 16px 120px; display: flex; flex-direction: column; gap: 18px; }
   .pk-head { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
   .pk-head img { height: 46px; width: auto; }
