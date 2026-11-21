@@ -5,7 +5,7 @@
  */
 'use strict';
 
-const APP_VERSION = '0.9.0';
+const APP_VERSION = '0.9.1';
 const EGIZ_URL = 'https://pdf.egiz.gv.at/';
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'libs/pdf.worker.min.js';
 
@@ -80,6 +80,7 @@ let toastTimer;
 function toast(msg) {
   const t = $('#toast'); t.textContent = msg; t.hidden = false;
   clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 3400);
+  t.onclick = () => { t.hidden = true; };
 }
 function download(blob, name) {
   const url = URL.createObjectURL(blob);
@@ -521,6 +522,9 @@ function renderChrome() {
       'aria-current': st.k === app.view ? 'step' : null, onclick: () => setView(st.k),
     }, h('span', { class: 'ico' }, icon(st.k)), h('span', { class: 'tick', 'aria-hidden': 'true' }, done ? '✓' : gated ? '' : '!'),
       h('span', { class: 'txt' }, h('b', {}, st.t), h('small', {}, st.s))); }));
+  // Hochformat: Ablauf scrollt quer, aktiven Schritt sichtbar machen
+  const on = nav.querySelector('.step.on');
+  if (on && nav.scrollWidth > nav.clientWidth) nav.scrollLeft += on.getBoundingClientRect().left - nav.getBoundingClientRect().left - 12;
   const i = STEPS.findIndex(x => x.k === app.view);
   const back = $('#btn-back'), next = $('#btn-next');
   back.hidden = i <= 0; next.hidden = i >= STEPS.length - 1;
@@ -554,39 +558,59 @@ function gatePage(page, view) {
 function rerender() { const y = window.scrollY; setView(app.view); window.scrollTo(0, y); }
 
 /* ---------- Start ---------- */
+/* Startbildschirm im Stil eines Plankopfs: links das Schriftfeld, rechts die Verhandlungen am Gerät */
+const ZIER = `<svg viewBox="0 0 600 420" aria-hidden="true" class="home-zier"><g fill="none" stroke="currentColor" stroke-width="1.4">
+  <path d="M40 360 L170 250 L330 286 L470 150 L570 190" /><path d="M170 250 L150 90 L300 60 L330 286" stroke-dasharray="7 5"/><path d="M470 150 L430 40" />
+  <g stroke-width="1.6"><circle cx="170" cy="250" r="7"/><circle cx="330" cy="286" r="7"/><circle cx="470" cy="150" r="7"/><circle cx="150" cy="90" r="7"/><circle cx="300" cy="60" r="7"/></g>
+  <g fill="currentColor" stroke="none" font-family="ui-monospace, Menlo, monospace" font-size="15"><text x="182" y="268">6368</text><text x="342" y="304">6370</text><text x="482" y="146">6371</text><text x="210" y="190" font-size="26" font-style="italic">.626</text></g>
+</g></svg>`;
 VIEWS.start = async page => {
   const main = $('#main');
   main.replaceChildren();
-  const list = h('div', { class: 'list' });
+  const list = h('div', { class: 'home-list' });
   const busy = async (btn, fn) => { btn.disabled = true; try { await fn(); } catch (err) { toast(err.message); } btn.disabled = false; };
-  main.append(h('div', { class: 'start' }, h('div', { class: 'start-inner' },
-    h('div', { class: 'start-card' },
-      h('div', { class: 'head' },
-        h('img', { src: 'assets/logo.png', alt: 'Vermessung ADP Rinner', width: 309, height: 92 }),
-        h('div', {}, h('span', { class: 'eyebrow' }, 'Digitale Grenzverhandlung'),
-          h('h1', {}, 'Wähle ein Projekt'),
-          h('p', { class: 'muted' }, 'Projekt nach Geschäftszahl antippen. Alle Unterlagen liegen am Gerät, die Verhandlung läuft auch ohne Netz.'))),
+  const zier = h('div', { class: 'home-deko' }); zier.innerHTML = ZIER;
+  const nord = h('div', { class: 'home-nord', 'aria-hidden': 'true' }); nord.innerHTML = '<svg viewBox="0 0 40 80"><path d="M20 4 L30 60 L20 52 L10 60 Z" fill="currentColor"/><text x="20" y="77" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">N</text></svg>';
+  main.append(h('div', { class: 'start home' }, zier, h('div', { class: 'home-inner' },
+    h('section', { class: 'home-kopf', 'aria-label': 'Digitale Grenzverhandlung' },
+      h('div', { class: 'hk-logo' }, h('img', { src: 'assets/logo.png', alt: 'Vermessung ADP Rinner', width: 309, height: 92 }), nord),
+      h('div', { class: 'hk-titel' }, h('span', { class: 'eyebrow' }, 'Grenzverhandlung vor Ort'), h('h1', {}, 'Digitale ', h('br'), 'Grenzverhandlung'),
+        h('p', {}, 'Protokoll über die Festlegung des Grenzverlaufs gemäß § 43 Abs. 6 VermG')),
+      h('dl', { class: 'hk-felder' },
+        h('div', {}, h('dt', {}, 'Kanzlei'), h('dd', {}, 'ADP Rinner ZT GmbH, Graz')),
+        h('div', {}, h('dt', {}, 'Version'), h('dd', { class: 'mono' }, APP_VERSION)),
+        h('div', {}, h('dt', {}, 'Betrieb'), h('dd', {}, navigator.onLine ? 'online · läuft auch offline' : 'offline · alles am Gerät')),
+        h('div', {}, h('dt', {}, 'Daten'), h('dd', {}, 'nur auf diesem Gerät'))),
+      h('div', { class: 'hk-massstab', 'aria-hidden': 'true' }, h('span'), h('span'), h('span'), h('span'), h('em', {}, h('span', {}, '0'), h('span', {}, '10'), h('span', {}, '20 m')))),
+    h('section', { class: 'home-akten', 'aria-label': 'Verhandlungen' },
+      h('div', { class: 'ha-head' }, h('h2', {}, 'Verhandlungen auf diesem Gerät'), h('span', { class: 'muted', id: 'home-count' })),
       list,
-      h('div', { class: 'foot' },
-        h('button', { class: 'btn primary', type: 'button', onclick: () => $('#file-zip').click() }, icon('upload'), 'Verhandlungspaket importieren'),
-        h('button', { class: 'btn', type: 'button', onclick: e => busy(e.currentTarget, async () => { const v = await createDemo(); toast('Demo-Verhandlung angelegt'); openGz(v.id); }) }, icon('plus'), 'Demo-Verhandlung anlegen'))),
-    h('details', {},
-      h('summary', {}, 'Wie kommt eine Verhandlung aufs Gerät?'),
-      h('div', { class: 'card stack' },
-        h('p', {}, 'Die Kanzlei stellt je Geschäftszahl ein ZIP-Paket zusammen: Kopfdaten, Beteiligte, GFN, Begehungsskizze und Unterlagen wie Angebot und Einladungen. Das geht im Büro am PC mit der Seite „Paket erstellen“. Telefonnummern und E-Mail-Adressen gehören nicht hinein.'),
-        h('div', { class: 'row' }, h('a', { class: 'btn', href: 'paket.html' }, icon('folder'), 'Paket erstellen (Büro)'), h('button', { class: 'btn', type: 'button', onclick: e => busy(e.currentTarget, async () => download(await demoZipBlob(), 'Beispielpaket_19389.zip')) }, 'Beispielpaket herunterladen')))),
-    h('p', { class: 'start-note' }, `Prototyp ${APP_VERSION} zur Masterarbeit „E-Geo-Government in der österreichischen Katastervermessung“, TU Graz. Daten bleiben ausschließlich auf diesem Gerät.`))));
-  app.list = (await DB.all()).map(migrate).sort((a, b) => b.updated - a.updated);
+      h('div', { class: 'ha-foot' },
+        h('button', { class: 'btn primary big', type: 'button', onclick: () => $('#file-zip').click() }, icon('upload'), 'Verhandlungspaket importieren'),
+        h('button', { class: 'btn', type: 'button', onclick: e => busy(e.currentTarget, async () => { const v = await createDemo(); toast('Demo-Verhandlung angelegt'); openGz(v.id); }) }, icon('plus'), 'Demo anlegen')),
+      h('details', { class: 'ha-hilfe' },
+        h('summary', {}, 'Wie kommt eine Verhandlung aufs Gerät?'),
+        h('p', {}, 'Die Kanzlei stellt je Geschäftszahl ein ZIP-Paket zusammen: Kopfdaten, Beteiligte, GFN, Begehungsskizze und Unterlagen wie Angebot und Ladung. Das geht im Büro am PC mit „Paket erstellen“. Telefonnummern und E-Mail-Adressen gehören nicht hinein.'),
+        h('div', { class: 'row' }, h('a', { class: 'btn small', href: 'paket.html' }, icon('folder'), 'Paket erstellen (Büro)'),
+          h('button', { class: 'btn small', type: 'button', onclick: e => busy(e.currentTarget, async () => download(await demoZipBlob(), 'Beispielpaket_19389.zip')) }, 'Beispielpaket herunterladen'))))),
+    h('p', { class: 'start-note' }, `Prototyp zur Masterarbeit „E-Geo-Government in der österreichischen Katastervermessung“, TU Graz`)));
+  app.list = (await DB.all()).map(migrate);
+  // anstehende Verhandlungen zuerst (nach Datum), erledigte ans Ende
+  const fertig = v => v.status === 'unterfertigt' || v.status === 'abgeschlossen';
+  app.list.sort((a, b) => (fertig(a) - fertig(b)) || String(a.meta.datum || '').localeCompare(String(b.meta.datum || '')) || b.updated - a.updated);
+  $('#home-count').textContent = app.list.length ? `${app.list.length}` : '';
   if (!app.list.length) {
-    list.replaceWith(h('div', { class: 'empty' }, 'Noch keine Verhandlung am Gerät. Importiere ein Verhandlungspaket oder lege die Demo-Verhandlung an.'));
+    list.replaceWith(h('div', { class: 'empty' }, h('strong', {}, 'Noch keine Verhandlung am Gerät.'), h('br'), 'Verhandlungspaket aus der Kanzlei importieren oder zum Ausprobieren die Demo anlegen.'));
     return;
   }
+  const heute = new Date().toISOString().slice(0, 10);
   for (const v of app.list) {
-    const s = STATUS[v.status], pr = progress(v);
-    list.append(h('div', { class: 'gz-row' }, h('button', { class: 'gz-item', type: 'button', onclick: () => openGz(v.id) },
-      h('span', { class: 'gz-badge' }, icon('folder')),
-      h('span', {}, h('span', { class: 'gz' }, `GZ ${v.gz}`), h('br'),
-        h('span', { class: 'meta' }, `${v.meta.kg || 'KG ?'}${v.meta.gemeinde ? ' · ' + v.meta.gemeinde : ''} · ${deDate(v.meta.datum)} · ${owners(v).length} Eigentümer · ${pr.done}/${pr.total} Schritte`)),
+    const s = STATUS[v.status], pr = progress(v), d = v.meta.datum ? new Date(v.meta.datum + 'T12:00') : null;
+    list.append(h('div', { class: 'gz-row' + (v.meta.datum === heute ? ' heute' : '') }, h('button', { class: 'gz-item', type: 'button', onclick: () => openGz(v.id) },
+      h('span', { class: 'gz-datum' }, d ? [h('b', {}, String(d.getDate())), h('small', {}, d.toLocaleDateString('de-AT', { month: 'short' }).replace('.', ''))] : h('small', {}, 'ohne Datum')),
+      h('span', { class: 'gz-txt' }, h('span', { class: 'gz' }, `GZ ${v.gz}`, v.meta.datum === heute ? h('span', { class: 'heute-tag' }, 'heute') : null),
+        h('span', { class: 'meta' }, [v.meta.kg && `KG ${v.meta.kg}`, (v.meta.ort || '').split(',')[0], `${owners(v).length} Eigentümer`].filter(Boolean).join(' · ')),
+        h('span', { class: 'gz-schritte', title: `${pr.done} von ${pr.total} Schritten erledigt` }, Array.from({ length: pr.total }, (_, i) => h('i', { class: i < pr.done ? 'on' : '' })))),
       h('span', { class: 'pill ' + s.cls }, s.label)),
       h('button', { class: 'icon-btn gz-del', type: 'button', title: 'Verhandlung löschen', 'aria-label': `Verhandlung GZ ${v.gz} löschen`, onclick: () => askDelete(v) }, icon('trash'))));
   }
@@ -840,10 +864,12 @@ function openDocs() {
       h('div', { class: 'docs-foot' },
         h('button', { class: 'btn small ghost', type: 'button', onclick: () => add.click() }, icon('plus'), 'PDF vom Gerät hinzufügen'), add),
       h('h3', { class: 'docs-sec' }, 'Allgemein'),
-      h('div', { class: 'docs-links' },
-        h('span', { class: 'lbl' }, 'Rechtstexte im RIS (geltende Fassung, braucht Internet)'),
-        RECHT.map(([t, sub, url]) => h('a', { class: 'doc-open', href: url, target: '_blank', rel: 'noopener' },
-          h('span', { class: 'doc-ico' }, icon('docs')), h('span', { class: 'doc-txt' }, h('b', {}, t), h('small', { class: 'muted' }, sub))))),
+      h('details', { class: 'docs-folder' },
+        h('summary', { class: 'doc-open' }, h('span', { class: 'doc-ico' }, icon('folder')),
+          h('span', { class: 'doc-txt' }, h('b', {}, 'Rechtsgrundlagen'), h('small', { class: 'muted' }, 'VermG, VermV 2016, StROG 2010, Forstgesetz 1975 · RIS, geltende Fassung, braucht Internet'))),
+        h('div', { class: 'docs-links' },
+          RECHT.map(([t, sub, url]) => h('a', { class: 'doc-open', href: url, target: '_blank', rel: 'noopener' },
+            h('span', { class: 'doc-ico' }, icon('docs')), h('span', { class: 'doc-txt' }, h('b', {}, t), h('small', { class: 'muted' }, sub)))))),
       h('div', { class: 'docs-links' },
         h('span', { class: 'lbl' }, 'Kataster und Karten (brauchen Internet)'),
         KARTEN.map(([t, sub, url]) => h('a', { class: 'doc-open', href: url, target: '_blank', rel: 'noopener' },
@@ -935,7 +961,7 @@ function lightbox(url) {
 /* ---------- 3 Begehungsskizze ---------- */
 function openSketch() {
   const v = app.cur;
-  Viewer.open({ blob: v.skizze.pdf, title: `Begehungsskizze · GZ ${v.gz}`, ink: v.skizze, editable: !isLocked(), fotoMarks: fotoMarks(v), onChange: () => touch(), onClose: () => rerender() });
+  Viewer.open({ blob: v.skizze.pdf, title: `Begehungsskizze · GZ ${v.gz}`, ink: v.skizze, editable: !isLocked(), onChange: () => touch(), onClose: () => rerender() });
 }
 /* Foto in der Skizze verorten (geht auch nach dem Sperren: der Fotoplan ist nicht Teil des Protokolls) */
 function verorten(f) {
