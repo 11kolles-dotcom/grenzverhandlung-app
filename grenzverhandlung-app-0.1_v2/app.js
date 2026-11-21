@@ -5,7 +5,7 @@
  */
 'use strict';
 
-const APP_VERSION = '0.9.3';
+const APP_VERSION = '0.9.4';
 const EGIZ_URL = 'https://pdf.egiz.gv.at/';
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'libs/pdf.worker.min.js';
 
@@ -900,14 +900,14 @@ function openFotos() {
       put(grid, h('figure', { class: 'foto' },
         h('button', { class: 'foto-img', type: 'button', 'aria-label': `Foto ${i + 1} groß ansehen`, onclick: () => lightbox(u) }, h('img', { src: u, alt: f.notiz || `Foto ${i + 1}` })),
         h('figcaption', {},
-          h('span', { class: 'muted' }, `${i + 1} · ${timeOf(f.zeit)} Uhr`),
+          h('span', { class: 'muted foto-nr' }, `Foto ${i + 1} · ${timeOf(f.zeit)} Uhr`),
+          v.skizze.pdf ? h('button', { class: 'btn small foto-act' + (f.pos ? ' verortet' : ''), type: 'button', title: 'Standort und Blickrichtung in der Skizze festlegen (nur für den Fotoplan, nicht im Protokoll)', onclick: () => verorten(f) },
+            icon('map'), f.pos ? `Verortet: Blatt ${f.pos.page}${f.pos.dir === null ? ', ohne Richtung' : ''}` : 'In Skizze verorten') : null,
           h('input', { type: 'text', value: f.notiz || '', placeholder: 'Notiz, z. B. Grenzstein GP 12', 'aria-label': `Notiz zu Foto ${i + 1}`, oninput: e => { f.notiz = e.target.value; touch(); } }),
-          v.skizze.pdf ? h('button', { class: 'btn small' + (f.pos ? '' : ' ghost'), type: 'button', title: 'Standort und Blickrichtung in der Skizze festlegen (nur für den Fotoplan, nicht im Protokoll)', onclick: () => verorten(f) },
-            icon('map'), f.pos ? `Blatt ${f.pos.page}${f.pos.dir === null ? ', ohne Richtung' : ''}` : 'In Skizze verorten') : null,
-          h('button', { class: 'icon-btn', type: 'button', title: 'Foto löschen', 'aria-label': `Foto ${i + 1} löschen`, onclick: () => {
+          h('button', { class: 'btn small ghost foto-act foto-del', type: 'button', 'aria-label': `Foto ${i + 1} löschen`, onclick: () => {
             if (!confirm(`Foto ${i + 1} löschen?`)) return;
             v.fotos.splice(i, 1); logEvent(`Foto ${i + 1} gelöscht`); touch(true); fill();
-          } }, icon('trash')))));
+          } }, icon('trash'), 'Löschen'))));
     });
   };
   const takePhotos = async e => {
