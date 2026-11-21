@@ -279,3 +279,53 @@ body .drop.over { background: var(--p-sky); }
 }
 .docs-panel .doc-txt b { white-space: normal; }
 .toast { cursor: pointer; }
+
+/* ---------- 0.9.3 Usability: Handy quer (wenig Höhe), Meldungen oben, aufklappbare Zeilen ---------- */
+.toast { top: calc(env(safe-area-inset-top, 0px) + 78px); bottom: auto !important; }
+summary { padding: 8px 0; }
+.v-hint { white-space: normal !important; max-width: calc(100% - 24px); text-align: center; }
+@media (max-height: 520px) and (orientation: landscape) {
+  .topbar { padding-top: 6px; padding-bottom: 6px; gap: 10px; }
+  .topbar .logo-chip, #net, #topbar-sub { display: none; }
+  .topbar .icon-btn { width: 40px; height: 40px; }
+  .docs-btn { min-height: 40px; padding-block: 4px; }
+  .docs-label { display: none; }
+  .stepper { width: 76px !important; padding: 8px 6px 80px !important; top: 54px !important; height: calc(100vh - 54px) !important; }
+  .stepper .progress, .step .txt { display: none !important; }
+  .step { justify-content: center; padding: 6px !important; min-height: 50px; }
+  .step .tick { left: 40px !important; }
+  .actionbar { left: 76px !important; padding-top: 6px; padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px)); }
+  .actionbar .btn { min-height: 40px; padding-block: 6px; }
+  .main { padding-top: 12px !important; padding-bottom: 76px !important; }
+  .toast { top: 60px; }
+  /* Viewer: Kopf und Werkzeuge in einer Zeile */
+  .viewer { display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto 1fr; }
+  .viewer-bar { grid-column: 1; grid-row: 1; flex-wrap: nowrap; padding-top: 6px !important; padding-bottom: 6px; }
+  .viewer-tools { grid-column: 2; grid-row: 1; flex-wrap: nowrap; overflow-x: auto; padding-top: 6px; padding-bottom: 6px; justify-content: flex-end; }
+  .viewer:has(#v-tools[hidden]) .viewer-bar { grid-column: 1 / -1; }
+  .viewer-search { grid-column: 1 / -1; grid-row: 2; padding-block: 6px; }
+  .viewer-stage { grid-column: 1 / -1; grid-row: 3; }
+  .viewer .v-title, #v-zoomlabel, #v-zoomout, #v-zoomin { display: none; }
+  .viewer-tools:not([hidden]) ~ .viewer-stage .v-hint { display: none; }
+  .viewer-bar .btn, .viewer-tools .btn, .viewer-tools .seg.big button { min-height: 40px; height: 40px; padding: 4px 8px; }
+  .viewer-tools .seg.big .swatch { width: 40px; }
+  .viewer-tools .seg.big button span, #v-undo span, #v-redo span, #v-searchbtn .v-lbl { display: none; }
+  /* Unterschriftenfeld füllt die Höhe */
+  .sigpad { padding: 6px; }
+  .sigpad-box { height: 100%; padding: 10px 14px; gap: 8px; }
+  .sigpad-box > p.muted { display: none; }
+  .sigpad-head h2 { font-size: 1.1rem; margin: 0; }
+  .sigpad-area { flex: 1; height: auto; min-height: 120px; }
+}
+/* Handy hoch: Startliste – Status unter den Text */
+@media (max-width: 560px) {
+  .start .gz-item { grid-template-columns: 64px 1fr; grid-template-areas: "d t" "d s"; row-gap: 6px; }
+  .start .gz-item .gz-datum { grid-area: d; }
+  .start .gz-item .gz-txt { grid-area: t; }
+  .start .gz-item .pill { grid-area: s; justify-self: start; }
+  .sigpad { padding: 8px; }
+  .sigpad-box { padding: 14px; max-height: 100%; overflow-y: auto; }
+}
+.quer-tipp { display: none; margin: 0; font-size: .85rem; font-weight: 600; color: var(--warn); }
+@media (max-width: 560px) and (orientation: portrait) { .quer-tipp { display: block; } }
+@media (max-width: 560px) { .start .gz-item .pill { white-space: normal; max-width: 100%; text-align: left; } }
