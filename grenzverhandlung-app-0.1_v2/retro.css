@@ -357,3 +357,6 @@ summary { padding: 8px 0; }
 .stift-info { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 4px; }
 .stift-info .sig-thumb { margin: 0; }
 .stift-hinweis { display: inline-block; margin-top: 4px; font-size: .88rem; font-weight: 600; color: var(--brand, #9b1b22); }
+
+/* 0.9.11: Hintergrundbild am Startbildschirm ganz leicht weichzeichnen */
+.start::before { -webkit-backdrop-filter: blur(2.5px); backdrop-filter: blur(2.5px); }

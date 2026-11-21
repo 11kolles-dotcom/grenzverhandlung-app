@@ -5,7 +5,7 @@
  */
 'use strict';
 
-const APP_VERSION = '0.9.10';
+const APP_VERSION = '0.9.11';
 const EGIZ_URL = 'https://pdf.egiz.gv.at/';
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'libs/pdf.worker.min.js';
 
