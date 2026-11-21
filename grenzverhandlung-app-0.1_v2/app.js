@@ -5,7 +5,7 @@
  */
 'use strict';
 
-const APP_VERSION = '0.9.11';
+const APP_VERSION = '0.9.12';
 const EGIZ_URL = 'https://pdf.egiz.gv.at/';
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'libs/pdf.worker.min.js';
 
@@ -586,7 +586,7 @@ VIEWS.start = async page => {
       h('summary', {}, 'Wie kommt eine Verhandlung aufs Gerät?'),
       h('div', { class: 'card stack' },
         h('p', {}, 'Die Kanzlei stellt je Geschäftszahl ein ZIP-Paket zusammen: Kopfdaten, Beteiligte, GFN, Begehungsskizze und Unterlagen wie Angebot und Ladung. Das geht im Büro am PC mit der Seite „Paket erstellen“. Telefonnummern und E-Mail-Adressen gehören nicht hinein.'),
-        h('div', { class: 'row' }, h('a', { class: 'btn', href: 'paket.html' }, icon('folder'), 'Paket erstellen (Büro)'), h('button', { class: 'btn', type: 'button', onclick: e => busy(e.currentTarget, async () => download(await demoZipBlob(), 'Beispielpaket_19389.zip')) }, 'Beispielpaket herunterladen')))),
+        h('div', { class: 'row' }, h('a', { class: 'btn', href: '../buero/' }, icon('folder'), 'Paket erstellen (Büro)'), h('button', { class: 'btn', type: 'button', onclick: e => busy(e.currentTarget, async () => download(await demoZipBlob(), 'Beispielpaket_19389.zip')) }, 'Beispielpaket herunterladen')))),
     h('p', { class: 'start-note' }, `Prototyp ${APP_VERSION} zur Masterarbeit „E-Geo-Government in der österreichischen Katastervermessung“, TU Graz. Daten bleiben ausschließlich auf diesem Gerät.`))));
   app.list = (await DB.all()).map(migrate);
   // anstehende Verhandlungen zuerst (nach Datum), erledigte ans Ende

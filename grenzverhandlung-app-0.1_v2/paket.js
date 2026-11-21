@@ -214,7 +214,7 @@ dropzone($('#drop-unt'), true, fs => {
   el.ondrop = e => { e.preventDefault(); el.classList.remove('over'); take([...e.dataTransfer.files]); };
 })();
 /* Protokoll der Kanzlei (Word-PDF) einlesen: Kopf und Zustimmungstabelle */
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'libs/pdf.worker.min.js';
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('libs/pdf.worker.min.js', document.currentScript ? document.currentScript.src : location.href).href;
 // Wörter zusammensetzen: Leerzeichen nur, wo im PDF wirklich eine Lücke ist (Word trennt z. B. Bindestriche ab)
 function joinItems(items) {
   let t = '', prev = null;
