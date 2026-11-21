@@ -40,6 +40,30 @@
   .pk-scroll { overflow-x: auto; }
   .pk-scroll .pk-table { min-width: 840px; }
   textarea.paste { width: 100%; min-height: 90px; font: .88rem var(--mono); padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); }
+  .pk .card > * { align-self: stretch; width: 100%; box-sizing: border-box; }
+  .step-h { display: flex; gap: 14px; align-items: flex-start; }
+  .step-n { flex: none; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; background: var(--surface-2); border: 2px solid var(--edge); }
+  .step.done .step-n { background: var(--good); border-color: var(--good); color: #fff; font-size: 0; }
+  .step.done .step-n::after { content: "✓"; font-size: 1.05rem; }
+  .drop.big { padding: 28px 16px; font-size: 1.05rem; }
+  .drop .small { font-size: .85rem; }
+  .sk-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 640px) { .sk-row { grid-template-columns: 1fr; } }
+  .pk-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .pk-list li { display: flex; gap: 8px; align-items: center; padding: 6px 6px 6px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); flex-wrap: wrap; }
+  .pk-list li .tag { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); min-width: 70px; }
+  .pk-list li input { flex: 1 1 160px; min-height: 40px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; font-size: .92rem; }
+  .pk-list li input.nr { flex: 0 1 190px; font-weight: 600; }
+  .pk-list li .fn { font-size: .8rem; color: var(--muted); max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pk-list li button.x { width: 40px; height: 40px; border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 1.1rem; border-radius: 8px; }
+  .pk-list li button.x:hover { background: var(--crit-soft); color: var(--crit); }
+  .sum { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; font-size: .95rem; }
+  .sum dt { color: var(--muted); }
+  .sum dd { margin: 0; font-weight: 600; }
+  .ppl { margin: 8px 0 0; padding-left: 20px; columns: 2; column-gap: 28px; font-size: .9rem; }
+  @media (max-width: 640px) { .ppl { columns: 1; } }
+  .ppl li { break-inside: avoid; margin-bottom: 2px; }
+  .ppl .muted { font-size: .82rem; }
 </style>
 </head>
 <body>
@@ -47,56 +71,33 @@
   <div class="pk-head">
     <img src="../grenzverhandlung-app-0.1_v2/assets/logo.png" alt="Vermessung ADP Rinner" width="155" height="46">
     <div><span class="eyebrow">Im Büro, vor dem Außendienst</span><h1>Verhandlungspaket erstellen</h1></div>
-    <span style="flex:1"></span>
-    <a class="btn ghost" href="../grenzverhandlung-app-0.1_v2/">Zur App</a>
   </div>
-  <p class="muted" style="margin:0">Daten eintragen, PDFs hineinziehen und das ZIP speichern. Das ZIP in den Projektordner legen und am Tablet in der App importieren. Nichts davon verlässt diesen PC.</p>
+  <p class="muted" style="margin:0">Drei Schritte: Protokoll einlesen, GFN dazulegen, Unterlagen dazulegen. Dann das ZIP speichern, in den Projektordner legen und am Tablet importieren. Nichts davon verlässt diesen PC.</p>
 
-  <section class="card">
-    <div><h2>Schnellstart: euer Protokoll einlesen</h2><p class="muted" style="margin:0">Das vorbereitete Protokoll (PDF aus Word, nicht gescannt) hineinziehen. Übernommen werden Vermessungsamt, KG, Projekt (GZ), Ort und alle Eigentümer aus der Zustimmungserklärung mit EZ, Gst.-Nr. und Anschrift.</p></div>
-    <div class="drop" id="drop-prot"><strong>Protokoll (PDF) hierher ziehen</strong> oder klicken</div>
+  <section class="card step" id="st-prot">
+    <div class="step-h"><span class="step-n">1</span><div><h2>Protokoll einlesen</h2><p class="muted" style="margin:0">Das vorbereitete Protokoll (PDF aus Word, nicht gescannt). GZ, Vermessungsamt, KG, Ort und alle Eigentümer werden daraus übernommen.</p></div></div>
+    <div class="drop big" id="drop-prot"><strong>Protokoll (PDF) hierher ziehen</strong> oder klicken</div>
+    <div id="prot-sum" hidden></div>
   </section>
 
-  <section class="card">
-    <div><h2>1 · Kopfdaten</h2></div>
-    <div class="form-grid" id="kopf"></div>
-  </section>
-
-  <section class="card">
-    <div><h2>2 · Beteiligte</h2><p class="muted" style="margin:0">Eigentümer laut Grundbuch, bekannte Vertreter. Keine Telefonnummern oder E-Mail-Adressen (DSGVO).</p></div>
-    <details><summary class="muted">Alternativ: Grundbuchsabfrage (CSV) einlesen</summary>
-    <div class="drop" id="drop-gb" style="margin-top:8px"><strong>Grundbuchsabfrage hierher ziehen</strong> oder klicken<br><span style="font-size:.85rem">beide CSV-Dateien gemeinsam: Eigentümer und Grundstücke (Zuordnung über die EZ). Übernimmt alle Eigentümer der Abfrage, nicht betroffene danach entfernen.</span></div></details>
-    <div class="pk-scroll"><table class="pk-table" id="bet"><thead><tr><th style="width:150px">Rolle</th><th style="width:80px">EZ</th><th style="width:90px">Gst.-Nr.</th><th>Name</th><th>Anschrift</th><th style="width:110px">Einladung</th><th>vertritt</th><th class="x"></th></tr></thead><tbody></tbody></table></div>
-    <div class="row">
-      <button class="btn small" type="button" id="add-bet">+ Person</button>
-      <span class="row" style="gap:6px"><label class="lbl" for="inv-all">Einladung für alle ohne Zeit</label><input id="inv-all" type="time" style="width:150px"><button class="btn small ghost" type="button" id="inv-go">Setzen</button></span>
-      <details style="flex:1"><summary class="muted">Aus Excel einfügen (Zeilen kopieren)</summary>
-        <p class="muted" style="margin:6px 0">Spalten EZ, Gst.-Nr., Name, Anschrift kopieren (eine Person je Zeile) und hier einfügen.</p>
-        <textarea class="paste" id="paste" placeholder="1012&#9;.626&#9;Johann Steiner&#9;Kapellenweg 7, 8101 Gratkorn"></textarea>
-        <button class="btn small" type="button" id="paste-go" style="margin-top:6px">Übernehmen</button>
-      </details>
-    </div>
-  </section>
-
-  <section class="card">
-    <div><h2>3 · GFN und andere Behelfe</h2><p class="muted" style="margin:0">Werden bei der Eröffnung angehakt und dann im Protokoll genannt. Die GFN aus der Grundstücksabfrage stehen schon da; die PDFs dazu hierher ziehen (Zuordnung über die Nummer im Dateinamen, z. B. 10828_2012_63.pdf) oder je Zeile wählen.</p></div>
-    <div class="pk-scroll"><table class="pk-table" id="beh"><thead><tr><th>Planverfasser</th><th style="width:150px">Geschäftszahl</th><th>Anmerkung</th><th style="width:200px">PDF</th><th class="x"></th></tr></thead><tbody></tbody></table></div>
+  <section class="card step" id="st-gfn">
+    <div class="step-h"><span class="step-n">2</span><div><h2>GFN einlesen</h2><p class="muted" style="margin:0">Die PDFs der Grundstücksfeststellungen, mehrere auf einmal. Die Nummer kommt aus dem Dateinamen (z. B. 10828_2012_63.pdf) und kann unten korrigiert werden.</p></div></div>
     <div class="drop" id="drop-beh"><strong>GFN-PDFs hierher ziehen</strong> oder klicken</div>
+    <ul class="pk-list" id="beh"></ul>
   </section>
 
-  <section class="card">
-    <div><h2>4 · Begehungsskizze</h2><p class="muted" style="margin:0">Der Plan, auf dem vor Ort gezeichnet wird.</p></div>
-    <div class="drop" id="drop-sk"><strong>Skizze (PDF) hierher ziehen</strong> oder klicken</div>
-  </section>
-
-  <section class="card">
-    <div><h2>5 · Unterlagen</h2><p class="muted" style="margin:0">Angebot, Einladungen, Grundbuchsauszug … Nur zum Nachschauen vor Ort, nicht Teil des Protokolls. Word-Dateien vorher als PDF speichern.</p></div>
-    <div class="pk-scroll"><table class="pk-table" id="unt"><thead><tr><th>Titel in der App</th><th style="width:260px">Datei</th><th class="x"></th></tr></thead><tbody></tbody></table></div>
-    <div class="drop" id="drop-unt"><strong>PDFs hierher ziehen</strong> oder klicken</div>
+  <section class="card step" id="st-unt">
+    <div class="step-h"><span class="step-n">3</span><div><h2>Unterlagen</h2><p class="muted" style="margin:0">Begehungsskizze und alles zum Nachschauen vor Ort (Angebot, Einladungen, Grundbuchsauszug …). Word-Dateien vorher als PDF speichern.</p></div></div>
+    <div class="sk-row">
+      <div class="drop" id="drop-sk"><strong>Begehungsskizze (PDF)</strong><br><span class="small">der Plan, auf dem vor Ort gezeichnet wird</span></div>
+      <div class="drop" id="drop-unt"><strong>Weitere Unterlagen (PDF)</strong><br><span class="small">mehrere auf einmal möglich</span></div>
+    </div>
+    <ul class="pk-list" id="unt"></ul>
   </section>
 </div>
 <div class="pk-bar">
-  <span class="muted" id="status">Pflicht: Geschäftszahl und mindestens ein Eigentümer.</span>
+  <span class="muted" id="status">Zuerst das Protokoll einlesen.</span>
+  <button class="btn ghost" type="button" id="neu" hidden>Nächstes Paket</button>
   <button class="btn primary" type="button" id="save">Paket speichern (ZIP)</button>
 </div>
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
