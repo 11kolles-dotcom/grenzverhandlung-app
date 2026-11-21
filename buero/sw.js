@@ -1,5 +1,5 @@
 /* Offline-Cache der Büro-App „GV Paket“ (eigener Ordner, damit sie getrennt von der Außendienst-App installierbar ist) */
-const CACHE = 'gv-buero-0.9.12b';
+const CACHE = 'gv-buero-0.9.13';
 const A = '../grenzverhandlung-app-0.1_v2/';
 const FILES = ['./', 'index.html', 'manifest.webmanifest', 'icon.svg', 'icon-192.png', 'icon-512.png',
   A + 'styles.css', A + 'retro.css', A + 'paket.js', A + 'libs/jszip.min.js', A + 'libs/pdf.min.js', A + 'libs/pdf.worker.min.js', A + 'assets/logo.png',
