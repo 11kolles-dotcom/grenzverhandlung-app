@@ -5,7 +5,7 @@
  */
 'use strict';
 
-const APP_VERSION = '0.8.4';
+const APP_VERSION = '0.9.0';
 const EGIZ_URL = 'https://pdf.egiz.gv.at/';
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'libs/pdf.worker.min.js';
 
@@ -415,6 +415,29 @@ function paintInk(ctx, ink, pageNo, k) {
   }
 }
 
+/* Foto-Standort in der Skizze: Kreis mit Nummer, Kegel in Blickrichtung (Seiten-Einheiten, y nach unten) */
+const FOTO_FARBE = '#e8710a';
+function fotoMarkGeom(m, zoom = 1) {
+  const r = 10 / Math.sqrt(Math.max(1, zoom)), L = r * 5, a = 0.45;
+  const cone = m.dir === null || m.dir === undefined ? null
+    : [[m.x, m.y], [m.x + L * Math.cos(m.dir - a), m.y + L * Math.sin(m.dir - a)], [m.x + L * Math.cos(m.dir + a), m.y + L * Math.sin(m.dir + a)]];
+  return { r, cone };
+}
+function paintFotoMark(ctx, m, k, zoom) {
+  const { r, cone } = fotoMarkGeom(m, zoom);
+  ctx.save();
+  if (cone) {
+    ctx.beginPath(); ctx.moveTo(cone[0][0] * k, cone[0][1] * k); ctx.lineTo(cone[1][0] * k, cone[1][1] * k); ctx.lineTo(cone[2][0] * k, cone[2][1] * k); ctx.closePath();
+    ctx.fillStyle = 'rgba(232,113,10,.28)'; ctx.fill(); ctx.strokeStyle = FOTO_FARBE; ctx.lineWidth = Math.max(1, r * 0.18 * k); ctx.stroke();
+  }
+  ctx.beginPath(); ctx.arc(m.x * k, m.y * k, r * k, 0, Math.PI * 2);
+  ctx.fillStyle = m.aktiv ? FOTO_FARBE : '#fff'; ctx.fill(); ctx.strokeStyle = FOTO_FARBE; ctx.lineWidth = Math.max(1.5, r * 0.25 * k); ctx.stroke();
+  ctx.fillStyle = m.aktiv ? '#fff' : FOTO_FARBE; ctx.font = `bold ${r * 1.15 * k}px Helvetica, Arial, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(String(m.nr), m.x * k, m.y * k + r * 0.06 * k);
+  ctx.restore();
+}
+const fotoMarks = v => () => v.fotos.map((f, i) => f.pos ? { ...f.pos, nr: i + 1 } : null).filter(Boolean);
+
 /* ---------- Bausteine ---------- */
 function sw(label, checked, onchange, disabled) {
   return h('label', { class: 'switch' },
@@ -466,6 +489,7 @@ function stepDone(k, v = app.cur) {
     case 'beschreibung': return !!v.beschreibung.gesehen && !!(v.beschreibung.text || '').trim();
     case 'abschluss': return !!v.locked;
     case 'zustimmung': return v.status === 'abgeschlossen' || v.status === 'unterfertigt';
+    case 'export': return v.log.some(e => /exportiert/.test(e.text));
     default: return false;
   }
 }
@@ -491,12 +515,12 @@ function renderChrome() {
     h('div', { class: 'progress' },
       h('div', { class: 'progress-label' }, h('span', {}, 'Fortschritt'), h('span', {}, `${pr.done} von ${pr.total}`)),
       h('div', { class: 'bar' }, h('span', { style: `width:${Math.round(pr.done / pr.total * 100)}%` }))),
-    STEPS.map(st => h('button', {
-      type: 'button', class: 'step' + (st.k === app.view ? ' on' : '') + (stepDone(st.k) ? ' done' : '') + (GATED.includes(st.k) && !isOpened() ? ' gated' : ''),
-      title: GATED.includes(st.k) && !isOpened() ? 'Erst nach der Eröffnung' : null,
+    STEPS.map(st => { const done = stepDone(st.k), gated = GATED.includes(st.k) && !isOpened(); return h('button', {
+      type: 'button', class: 'step' + (st.k === app.view ? ' on' : '') + (done ? ' done' : gated ? ' gated' : ' open'),
+      title: gated ? 'Erst nach der Eröffnung' : done ? 'erledigt' : 'noch offen',
       'aria-current': st.k === app.view ? 'step' : null, onclick: () => setView(st.k),
-    }, h('span', { class: 'ico' }, icon(st.k)), h('span', { class: 'tick' }, '✓'),
-      h('span', { class: 'txt' }, h('b', {}, st.t), h('small', {}, st.s)))));
+    }, h('span', { class: 'ico' }, icon(st.k)), h('span', { class: 'tick', 'aria-hidden': 'true' }, done ? '✓' : gated ? '' : '!'),
+      h('span', { class: 'txt' }, h('b', {}, st.t), h('small', {}, st.s))); }));
   const i = STEPS.findIndex(x => x.k === app.view);
   const back = $('#btn-back'), next = $('#btn-next');
   back.hidden = i <= 0; next.hidden = i >= STEPS.length - 1;
@@ -597,6 +621,22 @@ async function openGz(id) {
 }
 
 /* ---------- 1 Eröffnung und Beteiligte ---------- */
+/* Foto der Vollmacht: setzt „V.i.A.“ und kommt beim Sperren als Beilage ans Protokoll */
+function vollmachtFoto(holder, label, re, L) {
+  const inp = h('input', { type: 'file', accept: 'image/*', capture: 'environment', hidden: true, onchange: async e => {
+    const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+    holder.vollmachtFoto = await shrinkPhoto(f, 2000); holder.vollmacht = 'V.i.A.';
+    logEvent(`Vollmacht fotografiert (${label})`); re();
+  } });
+  if (holder.vollmachtFoto) {
+    const u = URL.createObjectURL(holder.vollmachtFoto);
+    return h('span', { class: 'row vm-foto', style: 'gap:8px' },
+      h('button', { class: 'vm-thumb', type: 'button', 'aria-label': 'Vollmacht groß ansehen', onclick: () => lightbox(u) }, h('img', { src: u, alt: 'Foto der Vollmacht' })),
+      h('span', { class: 'muted', style: 'font-size:.85rem' }, 'Vollmacht als Beilage'),
+      L ? null : h('button', { class: 'btn small ghost', type: 'button', onclick: () => { if (!confirm('Foto der Vollmacht entfernen?')) return; holder.vollmachtFoto = null; logEvent(`Foto der Vollmacht entfernt (${label})`); re(); } }, 'Entfernen'));
+  }
+  return L ? null : h('span', {}, h('button', { class: 'btn small', type: 'button', title: 'Wird beim Sperren als Beilage ans Protokoll angehängt', onclick: () => inp.click() }, icon('camera'), 'Vollmacht fotografieren'), inp);
+}
 function personCard(b) {
   const v = app.cur, L = isLocked();
   let card;
@@ -612,10 +652,11 @@ function personCard(b) {
   const vName = h('input', { type: 'text', value: b.vertreter.name, disabled: L, placeholder: 'Vor- und Nachname', 'aria-label': `Vertreter für ${b.name}`,
     oninput: e => { b.vertreter.name = e.target.value; touch(); }, onchange: () => logEvent(`${b.name}: vertreten durch ${b.vertreter.name}`) });
   if (app.focusVertreter === b.id) { app.focusVertreter = null; requestAnimationFrame(() => vName.focus()); }
-  card = h('div', { class: 'card person' + (present(b) ? '' : ' absent') },
+  const stCls = present(b) ? 'ok' : (isOwner ? b.abwesend : !b.anwesend && b.rolle !== 'Eigentümer') ? 'off' : 'open';
+  card = h('div', { class: 'card person st-' + stCls + (present(b) ? '' : ' absent') },
     h('div', { class: 'who' },
       h('div', { style: 'min-width:0;flex:1' },
-        h('div', { class: 'name-row' }, h('span', { class: 'name' }, b.name || 'ohne Namen'),
+        h('div', { class: 'name-row' }, h('span', { class: 'stmark ' + stCls, title: { ok: 'erfasst', off: 'abwesend', open: 'noch offen' }[stCls] }, { ok: '✓', off: '–', open: '!' }[stCls]), h('span', { class: 'name' }, b.name || 'ohne Namen'),
           b.einladung ? h('span', { class: 'pill invite', title: 'Uhrzeit laut Einladung' }, icon('clock'), `eingeladen ${b.einladung} Uhr`) : null),
         h('div', { class: 'sub' }, [b.rolle === 'Vertreter' && b.vertritt ? `Vertreter für ${b.vertritt}` : b.rolle,
           isOwner && b.vertreten && b.vertreter.name ? `vertreten durch ${b.vertreter.name}` : null,
@@ -630,7 +671,7 @@ function personCard(b) {
       isOwner && (b.vertreten || b.abwesend) ? null : h('span', { class: 'row', style: 'gap:6px' }, h('span', { class: 'lbl' }, 'Identität'),
         seg(IDNACHWEIS, b.idnachweis, val => { b.idnachweis = val; re(); }, L || !b.anwesend, 'Identitätsnachweis')),
       b.rolle === 'Vertreter' ? h('span', { class: 'row', style: 'gap:6px' }, h('span', { class: 'lbl' }, 'Vollmacht'),
-        seg(VOLLMACHT, b.vollmacht, val => { b.vollmacht = val; re(); }, L, 'Vollmacht')) : null,
+        seg(VOLLMACHT, b.vollmacht, val => { b.vollmacht = val; re(); }, L, 'Vollmacht'), vollmachtFoto(b, `${b.name}${b.vertritt ? ` für ${b.vertritt}` : ''}`, re, L)) : null,
       h('span', { style: 'flex:1' }),
       h('button', { class: 'btn small ghost', type: 'button', disabled: L, 'aria-expanded': String(editing), onclick: () => { app.editing = editing ? null : b.id; re(); } }, icon('pen'), editing ? 'Fertig' : 'Bearbeiten')),
     isOwner && b.vertreten ? h('div', { class: 'vertreter' },
@@ -638,7 +679,8 @@ function personCard(b) {
       h('div', { class: 'row', style: 'gap:6px' }, h('span', { class: 'lbl' }, 'Identität'),
         seg(IDNACHWEIS, b.vertreter.idnachweis, val => { b.vertreter.idnachweis = val; re(); }, L, 'Identitätsnachweis des Vertreters')),
       h('div', { class: 'row', style: 'gap:6px' }, h('span', { class: 'lbl' }, 'Vollmacht'),
-        seg(VOLLMACHT, b.vertreter.vollmacht, val => { b.vertreter.vollmacht = val; re(); }, L, 'Art der Vollmacht'))) : null,
+        seg(VOLLMACHT, b.vertreter.vollmacht, val => { b.vertreter.vollmacht = val; re(); }, L, 'Art der Vollmacht')),
+      vollmachtFoto(b.vertreter, `${b.name}, vertreten durch ${b.vertreter.name || '…'}`, re, L)) : null,
     editing ? h('div', { class: 'stack' },
       h('div', { class: 'edit' },
         field('Name', b.name, val => { b.name = val; touch(); }),
@@ -684,6 +726,12 @@ function behelfeVorhalten() {
         logEvent(`Behelf ${f.name} ergänzt`); touch(true); rerender();
       } })));
 }
+/* Eröffnungstext wie im Protokoll (Seite 1): steht auch auf der Startseite der Verhandlung zum Vorlesen */
+function eroeffnungsText(v) {
+  const ortKurz = (v.meta.ort || '').split(',')[0].trim();
+  return [`Die Verhandlung über den Grenzverlauf wird am ${deDate(v.meta.datum) || '……………'} um ${v.meta.eroeffnung || '. . . . . . . .'} Uhr in ${ortKurz || '…'} eröffnet. Der Verhandlungsleiter überzeugt sich von der Persönlichkeit der anwesenden Personen und prüft die Vertretungsbefugnis.`,
+    'Der Verhandlungsleiter legt den Gegenstand der Grenzverhandlung dar, der die Festlegung der Grenzen der in der Beschreibung des Grenzverlaufs näher bezeichneten Grundstücke betrifft und hält folgende Behelfe vor:'];
+}
 VIEWS.eroeffnung = page => {
   const v = app.cur, L = isLocked();
   const m = v.meta;
@@ -706,6 +754,7 @@ VIEWS.eroeffnung = page => {
         m.eroeffnung
           ? h('div', { class: 'opened' }, icon('check'), h('div', {}, h('strong', {}, `Eröffnet um ${m.eroeffnung} Uhr`), h('span', { class: 'muted' }, `${anw} von ${v.beteiligte.length} anwesend`)))
           : h('button', { class: 'btn primary big', type: 'button', disabled: L, onclick: open }, icon('clock'), 'Verhandlung eröffnen'))),
+    eroeffnungKarte(v),
     h('details', { class: 'card flat kopf' },
       h('summary', {}, 'Kopfdaten ändern'),
       h('div', { class: 'form-grid', style: 'margin-top:14px' },
@@ -726,6 +775,17 @@ VIEWS.eroeffnung = page => {
     h('div', { class: 'grid2' }, v.beteiligte.map(personCard)));
 };
 
+function eroeffnungKarte(v) {
+  const [a, b] = eroeffnungsText(v), gfn = v.behelfe.filter(x => x.vorgehalten);
+  const open = !!v.meta.eroeffnung;
+  return h('details', { class: 'card vorlesen', open: open ? null : 'open' },
+    h('summary', {}, h('span', { class: 'eyebrow' }, 'Zum Vorlesen'), h('strong', {}, ' Eröffnungstext wie im Protokoll')),
+    h('div', { class: 'vorlesen-text' },
+      h('p', {}, a),
+      h('p', {}, b),
+      h('p', { class: 'muted' }, gfn.length ? gfn.map(x => `${x.gz}${x.planverfasser ? ` (${x.planverfasser})` : ''}`).join(' · ') : 'Behelfe unten anhaken, sobald sie vorgehalten wurden.')),
+    open ? null : h('p', { class: 'muted', style: 'margin:6px 0 0;font-size:.85rem' }, 'Die Uhrzeit wird beim Eröffnen eingesetzt.'));
+}
 /* Personen ohne Einladungszeit: eine Zeit für alle setzen (z. B. wenn das Paket keine Zeiten enthielt) */
 function einladungFehlt() {
   const v = app.cur, ohne = v.beteiligte.filter(b => !b.einladung && b.rolle !== 'Anwesend (sonstige)');
@@ -775,17 +835,30 @@ function openDocs() {
       h('div', { class: 'docs-head' },
         h('div', {}, h('h2', {}, 'Unterlagen'), h('p', { class: 'muted' }, `GZ ${v.gz} · nur zum Ansehen, nicht Teil des Protokolls`)),
         h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Schließen', onclick: closeDocs }, '✕')),
+      h('h3', { class: 'docs-sec' }, `Zu dieser GZ`),
       listEl,
       h('div', { class: 'docs-foot' },
         h('button', { class: 'btn small ghost', type: 'button', onclick: () => add.click() }, icon('plus'), 'PDF vom Gerät hinzufügen'), add),
+      h('h3', { class: 'docs-sec' }, 'Allgemein'),
       h('div', { class: 'docs-links' },
-        h('span', { class: 'lbl' }, 'Online-Karten (brauchen Internet)'),
+        h('span', { class: 'lbl' }, 'Rechtstexte im RIS (geltende Fassung, braucht Internet)'),
+        RECHT.map(([t, sub, url]) => h('a', { class: 'doc-open', href: url, target: '_blank', rel: 'noopener' },
+          h('span', { class: 'doc-ico' }, icon('docs')), h('span', { class: 'doc-txt' }, h('b', {}, t), h('small', { class: 'muted' }, sub))))),
+      h('div', { class: 'docs-links' },
+        h('span', { class: 'lbl' }, 'Kataster und Karten (brauchen Internet)'),
         KARTEN.map(([t, sub, url]) => h('a', { class: 'doc-open', href: url, target: '_blank', rel: 'noopener' },
           h('span', { class: 'doc-ico' }, icon('map')), h('span', { class: 'doc-txt' }, h('b', {}, t), h('small', { class: 'muted' }, sub)))))));
   document.body.append(sheet);
   sheet.querySelector('.docs-panel button').focus();
 }
 function closeDocs() { const d = $('#docs'); if (d) d.remove(); }
+const RIS = (abfrage, nr) => `https://www.ris.bka.gv.at/GeltendeFassung.wxe?Abfrage=${abfrage}&Gesetzesnummer=${nr}`;
+const RECHT = [
+  ['Vermessungsgesetz (VermG)', 'u. a. § 43 Abs. 6 Zustimmung zum Grenzverlauf', RIS('Bundesnormen', '10011400')],
+  ['Vermessungsverordnung 2016 (VermV)', 'u. a. § 13 Inhalt des Protokolls', RIS('Bundesnormen', '20009675')],
+  ['Stmk. Raumordnungsgesetz 2010 (StROG)', 'Landesrecht Steiermark', RIS('LrStmk', '20000069')],
+  ['Forstgesetz 1975', 'Bundesrecht', RIS('Bundesnormen', '10010371')],
+];
 const KARTEN = [
   ['Kataster BEV', 'kataster.bev.gv.at · aktueller Kataster mit Orthofoto', 'https://kataster.bev.gv.at/#/center/13.35,47.77/zoom/7.2/ortho/1/vermv/0.6'],
   ['GIS Steiermark', 'gis.stmk.gv.at · Basiskarten, Kataster', 'https://gis.stmk.gv.at/wgportal/atlasmobile/map/Basiskarten/Kataster'],
@@ -817,6 +890,8 @@ function openFotos() {
         h('figcaption', {},
           h('span', { class: 'muted' }, `${i + 1} · ${timeOf(f.zeit)} Uhr`),
           h('input', { type: 'text', value: f.notiz || '', placeholder: 'Notiz, z. B. Grenzstein GP 12', 'aria-label': `Notiz zu Foto ${i + 1}`, oninput: e => { f.notiz = e.target.value; touch(); } }),
+          v.skizze.pdf ? h('button', { class: 'btn small' + (f.pos ? '' : ' ghost'), type: 'button', title: 'Standort und Blickrichtung in der Skizze festlegen (nur für den Fotoplan, nicht im Protokoll)', onclick: () => verorten(f) },
+            icon('map'), f.pos ? `Blatt ${f.pos.page}${f.pos.dir === null ? ', ohne Richtung' : ''}` : 'In Skizze verorten') : null,
           h('button', { class: 'icon-btn', type: 'button', title: 'Foto löschen', 'aria-label': `Foto ${i + 1} löschen`, onclick: () => {
             if (!confirm(`Foto ${i + 1} löschen?`)) return;
             v.fotos.splice(i, 1); logEvent(`Foto ${i + 1} gelöscht`); touch(true); fill();
@@ -840,7 +915,14 @@ function openFotos() {
         h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Schließen', onclick: close }, '✕')),
       h('div', { class: 'row' },
         h('button', { class: 'btn primary big', type: 'button', onclick: () => cam.click() }, icon('camera'), 'Foto aufnehmen'), cam,
-        h('button', { class: 'btn small ghost', type: 'button', onclick: () => gal.click() }, 'Aus Galerie'), gal),
+        h('button', { class: 'btn small ghost', type: 'button', onclick: () => gal.click() }, 'Aus Galerie'), gal,
+        h('span', { style: 'flex:1' }),
+        h('button', { class: 'btn small', type: 'button', disabled: !v.fotos.some(f => f.pos), title: 'Skizze mit Standorten und Blickrichtungen, dahinter die Fotos. Geht mit dem Export ins Büro.', onclick: async e => {
+          const bt = e.currentTarget; bt.disabled = true;
+          try { const pdf = await buildFotoplan(v); close(); Viewer.open({ blob: new Blob([pdf], { type: 'application/pdf' }), title: `Fotoplan · GZ ${v.gz}`, onClose: () => openFotos() }); }
+          catch (err) { toast('Fotoplan fehlgeschlagen: ' + err.message); bt.disabled = false; }
+        } }, icon('pdf'), 'Fotoplan ansehen')),
+      h('p', { class: 'muted', style: 'margin:0;font-size:.85rem' }, 'Verortete Fotos erscheinen mit Nummer und Blickrichtung im Fotoplan (Export), nicht im Protokoll.'),
       grid));
   document.body.append(sheet);
 }
@@ -853,13 +935,21 @@ function lightbox(url) {
 /* ---------- 3 Begehungsskizze ---------- */
 function openSketch() {
   const v = app.cur;
-  Viewer.open({ blob: v.skizze.pdf, title: `Begehungsskizze · GZ ${v.gz}`, ink: v.skizze, editable: !isLocked(), onChange: () => touch(), onClose: () => rerender() });
+  Viewer.open({ blob: v.skizze.pdf, title: `Begehungsskizze · GZ ${v.gz}`, ink: v.skizze, editable: !isLocked(), fotoMarks: fotoMarks(v), onChange: () => touch(), onClose: () => rerender() });
+}
+/* Foto in der Skizze verorten (geht auch nach dem Sperren: der Fotoplan ist nicht Teil des Protokolls) */
+function verorten(f) {
+  const v = app.cur, nr = v.fotos.indexOf(f) + 1;
+  closeDocs();
+  Viewer.open({ blob: v.skizze.pdf, title: `Foto ${nr} in der Skizze verorten`, ink: v.skizze, editable: false, place: { nr, onSet: pos => { f.pos = pos; touch(); } },
+    startPage: f.pos ? f.pos.page : 1, fotoMarks: fotoMarks(v), onClose: () => { if (f.pos) logEvent(`Foto ${nr} in der Skizze verortet`); touch(true); openFotos(); } });
 }
 VIEWS.skizze = page => {
   const v = app.cur, L = isLocked();
   const up = h('input', { type: 'file', accept: 'application/pdf', hidden: true, onchange: async e => {
     const f = e.target.files[0]; if (!f) return;
     v.skizze = { pdf: f, strokes: [], texts: [], symbols: [], rev: (v.skizze.rev || 0) + 1 };
+    v.fotos.forEach(x => { delete x.pos; });
     logEvent(`Begehungsskizze ersetzt (${f.name})`); touch(true); rerender();
   } });
   if (!v.skizze.pdf) {
@@ -961,7 +1051,9 @@ VIEWS.abschluss = page => {
     h('div', { class: 'card stack' },
       h('div', { class: 'field', style: 'max-width:340px' }, h('label', { for: 'f-schluss' }, 'Schluss der Verhandlung (Uhrzeit)'),
         h('div', { class: 'inline-time' }, schluss,
-          h('button', { class: 'btn', type: 'button', onclick: () => { v.meta.schluss = nowTime(); logEvent(`Verhandlung geschlossen um ${v.meta.schluss} Uhr`); touch(true); rerender(); } }, 'Jetzt')))),
+          h('button', { class: 'btn', type: 'button', onclick: () => { v.meta.schluss = nowTime(); logEvent(`Verhandlung geschlossen um ${v.meta.schluss} Uhr`); touch(true); rerender(); } }, 'Jetzt'))),
+      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: sigSeite(v), onchange: e => { v.meta.sigSeite = e.target.checked; touch(); } }),
+        h('span', {}, h('strong', {}, 'Signaturseite für ID Austria anfügen'), h('span', { class: 'muted' }, ' · ein nummeriertes Feld je Eigentümer und für den Verhandlungsleiter')))),
     h('div', { class: 'card' },
       h('div', { class: 'card-head' }, h('h2', {}, 'Pflichtangaben nach § 13 VermV 2016'),
         h('span', { class: 'pill ' + (allOk ? 'good' : 'warn') }, `${ok} von ${checks.length} erfüllt`)),
@@ -983,7 +1075,127 @@ VIEWS.abschluss = page => {
       })));
 };
 
+/* ---------- Signaturprüfung (offline) ----------
+   Liest jede Signatur im PDF (PAdES/CMS): Unterzeichner aus dem Zertifikat, Zeitpunkt, ob der signierte Inhalt
+   unverändert ist (Hash über /ByteRange = messageDigest) und ob die Signatur mathematisch zum Zertifikat passt.
+   Nicht geprüft wird, ob das Zertifikat vertrauenswürdig und nicht widerrufen ist: das braucht eine Online-Prüfung
+   (z. B. RTR-Signaturprüfung) und passiert im Büro. */
+const OID = {
+  sha256: '2.16.840.1.101.3.4.2.1', sha384: '2.16.840.1.101.3.4.2.2', sha512: '2.16.840.1.101.3.4.2.3',
+  rsa: '1.2.840.113549.1.1.1', rsaSha256: '1.2.840.113549.1.1.11', rsaSha384: '1.2.840.113549.1.1.12', rsaSha512: '1.2.840.113549.1.1.13',
+  ecPub: '1.2.840.10045.2.1', ecdsaSha256: '1.2.840.10045.4.3.2', ecdsaSha384: '1.2.840.10045.4.3.3', ecdsaSha512: '1.2.840.10045.4.3.4',
+  p256: '1.2.840.10045.3.1.7', p384: '1.3.132.0.34', p521: '1.3.132.0.35',
+  cn: '2.5.4.3', sn: '2.5.4.4', gn: '2.5.4.42', o: '2.5.4.10',
+  messageDigest: '1.2.840.113549.1.9.4', signingTime: '1.2.840.113549.1.9.5',
+};
+function derRead(b, p = 0) {
+  const tag = b[p]; let len = b[p + 1], hl = 2;
+  if (len & 0x80) { const n = len & 0x7f; len = 0; for (let i = 0; i < n; i++) len = len * 256 + b[p + 2 + i]; hl = 2 + n; }
+  const node = { tag, start: p, hs: p + hl, end: p + hl + len, b };
+  if (tag & 0x20) { node.kids = []; let q = node.hs; while (q < node.end) { const k = derRead(b, q); node.kids.push(k); q = k.end; } }
+  return node;
+}
+const derBytes = n => n.b.subarray(n.start, n.end);
+const derVal = n => n.b.subarray(n.hs, n.end);
+function derOid(n) {
+  const v = derVal(n), out = [Math.floor(v[0] / 40), v[0] % 40]; let x = 0;
+  for (let i = 1; i < v.length; i++) { x = x * 128 + (v[i] & 0x7f); if (!(v[i] & 0x80)) { out.push(x); x = 0; } }
+  return out.join('.');
+}
+const derStr = n => new TextDecoder(n.tag === 0x1e ? 'utf-16be' : 'utf-8').decode(derVal(n));
+function derTime(n) {
+  const s = new TextDecoder().decode(derVal(n));
+  const m = n.tag === 0x17 ? s.match(/^(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})?/) : s.match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})?/);
+  if (!m) return null;
+  const yr = n.tag === 0x17 ? (+m[1] < 50 ? 2000 + +m[1] : 1900 + +m[1]) : +m[1];
+  return Date.UTC(yr, +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0));
+}
+function nameAttrs(name) {
+  const out = {};
+  for (const rdn of name.kids || []) for (const atv of rdn.kids || []) out[derOid(atv.kids[0])] = derStr(atv.kids[1]);
+  return out;
+}
+function ecdsaRaw(sigDer, size) {
+  const s = derRead(sigDer), out = new Uint8Array(size * 2);
+  s.kids.forEach((k, i) => { let v = derVal(k); while (v.length > size && v[0] === 0) v = v.subarray(1); out.set(v, i * size + size - v.length); });
+  return out;
+}
+const hashName = oid => ({ [OID.sha256]: 'SHA-256', [OID.sha384]: 'SHA-384', [OID.sha512]: 'SHA-512' })[oid];
+const bytesEq = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
+
+async function pruefeSignaturen(bytes) {
+  const txt = new TextDecoder('latin1').decode(bytes), res = [];
+  const re = /\/ByteRange\s*\[\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s*\]/g; let m;
+  while ((m = re.exec(txt))) {
+    const [a, b, c, d] = m.slice(1).map(Number);
+    const r = { bis: c + d, ganzeDatei: c + d === bytes.length && a === 0, name: '', zeit: null, inhaltOk: false, signaturOk: null, fehler: '' };
+    try {
+      const hex = txt.slice(a + b, c).replace(/[<>\s]/g, '');
+      const cms = new Uint8Array(hex.length / 2); for (let i = 0; i < cms.length; i++) cms[i] = parseInt(hex.substr(i * 2, 2), 16);
+      const ci = derRead(cms), sd = ci.kids[1].kids[0];
+      const certsNode = sd.kids.find(k => k.tag === 0xa0), si = sd.kids[sd.kids.length - 1].kids[0];
+      const sid = si.kids[1], digestAlg = derOid(si.kids[2].kids[0]);
+      let i = 3, attrs = null; if (si.kids[i].tag === 0xa0) attrs = si.kids[i++];
+      const sigAlg = derOid(si.kids[i].kids[0]), sigVal = derVal(si.kids[i + 1]);
+      // Zertifikat des Unterzeichners (über die Seriennummer)
+      const certs = (certsNode ? certsNode.kids : []).filter(k => k.tag === 0x30);
+      const serialOf = c => { const t = c.kids[0], o = t.kids[0].tag === 0xa0 ? 1 : 0; return derVal(t.kids[o]); };
+      const sidSerial = sid.tag === 0x30 ? derVal(sid.kids[1]) : null;
+      const cert = certs.find(c => sidSerial && bytesEq(serialOf(c), sidSerial)) || certs[0];
+      if (cert) {
+        const t = cert.kids[0], o = t.kids[0].tag === 0xa0 ? 1 : 0, subj = nameAttrs(t.kids[o + 4]);
+        r.name = subj[OID.cn] || [subj[OID.gn], subj[OID.sn]].filter(Boolean).join(' ');
+        r.aussteller = nameAttrs(t.kids[o + 2])[OID.cn] || '';
+        r.gueltigBis = derTime(t.kids[o + 3].kids[1]);
+        r.spki = derBytes(t.kids[o + 5]);
+      }
+      // Zeitpunkt: signingTime oder /M im Signaturwörterbuch
+      let md = null;
+      for (const at of attrs ? attrs.kids : []) {
+        const oid = derOid(at.kids[0]);
+        if (oid === OID.messageDigest) md = derVal(at.kids[1].kids[0]);
+        if (oid === OID.signingTime) r.zeit = derTime(at.kids[1].kids[0]);
+      }
+      if (!r.zeit) {
+        const win = txt.slice(Math.max(0, m.index - 1500), Math.min(txt.length, m.index + 300));
+        const mm = win.match(/\/M\s*\(D:(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})([Z+-])?(\d{2})?'?(\d{2})?/);
+        if (mm) r.zeit = Date.UTC(+mm[1], +mm[2] - 1, +mm[3], +mm[4], +mm[5], +mm[6]) - (mm[7] === '+' ? 1 : mm[7] === '-' ? -1 : 0) * ((+mm[8] || 0) * 60 + (+mm[9] || 0)) * 60e3;
+      }
+      // Inhalt unverändert: Hash über die signierten Bereiche
+      const data = new Uint8Array(b + d); data.set(bytes.subarray(a, a + b)); data.set(bytes.subarray(c, c + d), b);
+      const hn = hashName(digestAlg);
+      if (!hn) throw new Error('Hash-Verfahren nicht unterstützt');
+      const h = new Uint8Array(await crypto.subtle.digest(hn, data));
+      r.inhaltOk = md ? bytesEq(h, md) : false;
+      // Signatur mathematisch prüfen (über die signierten Attribute)
+      if (attrs && r.spki) {
+        const signed = derBytes(attrs).slice(); signed[0] = 0x31;
+        const spki = derRead(r.spki), keyAlg = derOid(spki.kids[0].kids[0]);
+        if (keyAlg === OID.ecPub) {
+          const curve = { [OID.p256]: ['P-256', 32], [OID.p384]: ['P-384', 48], [OID.p521]: ['P-521', 66] }[derOid(spki.kids[0].kids[1])];
+          const hs = { [OID.ecdsaSha256]: 'SHA-256', [OID.ecdsaSha384]: 'SHA-384', [OID.ecdsaSha512]: 'SHA-512' }[sigAlg] || hn;
+          const key = await crypto.subtle.importKey('spki', r.spki, { name: 'ECDSA', namedCurve: curve[0] }, false, ['verify']);
+          r.signaturOk = await crypto.subtle.verify({ name: 'ECDSA', hash: hs }, key, ecdsaRaw(sigVal, curve[1]), signed);
+        } else if (keyAlg === OID.rsa && sigAlg !== '1.2.840.113549.1.1.10') {
+          const hs = { [OID.rsaSha256]: 'SHA-256', [OID.rsaSha384]: 'SHA-384', [OID.rsaSha512]: 'SHA-512' }[sigAlg] || hn;
+          const key = await crypto.subtle.importKey('spki', r.spki, { name: 'RSASSA-PKCS1-v1_5', hash: hs }, false, ['verify']);
+          r.signaturOk = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, sigVal, signed);
+        }
+      }
+      delete r.spki;
+    } catch (e) { r.fehler = 'Signatur nicht lesbar: ' + e.message; }
+    res.push(r);
+  }
+  return res;
+}
+/* Passt der Name im Zertifikat zum Namen in der App? (Titel und Reihenfolge egal) */
+const namePasst = (zert, name) => { const a = nameTokens(zert), k = nameTokens(name); return a.length && k.length && k.every(t => a.includes(t)); };
+const sigUrteil = s => s.fehler ? 'nicht lesbar' : !s.inhaltOk ? 'Inhalt verändert' : s.signaturOk === false ? 'Signatur ungültig' : s.signaturOk === null ? 'Inhalt unverändert (Signatur nicht prüfbar)' : 'gültig, Inhalt unverändert';
+
 /* ---------- 6 Zustimmung ---------- */
+/* Nummer des Signaturfelds (QR-Platzhalter) auf der Signaturseite: Eigentümer 1…n, Verhandlungsleiter n+1 */
+const sigNr = (v, b) => b ? owners(v).indexOf(b) + 1 : owners(v).length + 1;
+const sigSeite = v => v.meta.sigSeite !== false;
 function currentPdf() { const v = app.cur; return v.signed ? v.signed.pdf : v.locked.pdf; }
 function pdfFileName(v, suffix) { return `Protokoll_${safeName(v.gz)}_V${v.version}_${suffix}.pdf`; }
 const personById = id => app.cur.beteiligte.find(x => x.id === id);
@@ -998,7 +1210,31 @@ function countSignatures(bytes) {
   const s = new TextDecoder('latin1').decode(bytes);
   return (s.match(/\/ByteRange\s*\[/g) || []).length;
 }
-function startQes(pending) {
+/* Fotos von Papier-Unterschriften: Vor der ersten QES werden sie als Beilage „Unterschriften auf Papier“ an das
+   gesperrte Protokoll angehängt (neue Prüfsumme, im Verlauf vermerkt). Danach bleibt das PDF unverändert und die
+   Fotos gehen als nachgereichte Unterschriften in eigenen Dateien mit dem Export ins Büro. */
+const papierOffen = v => owners(v).filter(b => b.zustimmung.art === 'papier' && b.zustimmung.foto && !b.zustimmung.fotoImPdf);
+async function papierInsPdf(v) {
+  const neu = papierOffen(v);
+  if (v.signed || !v.locked || !neu.length) return false;
+  const doc = await PDFLib.PDFDocument.load(await blobBytes(v.locked.pdf));
+  const F = await doc.embedFont(PDFLib.StandardFonts.Helvetica);
+  for (const b of neu) await fotoBeilage(doc, F, b.zustimmung.foto, `Beilage zum Protokoll, Projekt ${v.gz}: Unterschriften auf Papier – ${b.name}${b.ez ? `, EZ ${b.ez}` : ''} (Foto vom ${deDateTime(b.zustimmung.fotoZeit || Date.now())})`);
+  const bytes = await doc.save();
+  const hash = await sha256Hex(bytes);
+  v.locked = { ...v.locked, pdf: new Blob([bytes], { type: 'application/pdf' }), hash, beilagen: (v.locked.beilagen || 0) + neu.length };
+  neu.forEach(b => { b.zustimmung.fotoImPdf = true; });
+  logEvent(`Fotos der Papier-Unterschriften (${neu.map(b => b.name).join(', ')}) als Beilage angefügt, neue SHA-256 ${hash.slice(0, 16)}…`);
+  await touch(true);
+  return true;
+}
+async function papierFoto(b, file) {
+  b.zustimmung.foto = await shrinkPhoto(file, 2400); b.zustimmung.fotoZeit = Date.now(); b.zustimmung.fotoImPdf = false;
+  logEvent(`${b.name}: Foto der Unterschrift auf Papier${app.cur.signed ? ' (nachgereicht, eigene Datei im Export)' : ''}`);
+  await touch(true); rerender();
+}
+async function startQes(pending) {
+  try { await papierInsPdf(app.cur); } catch (e) { toast('Fotos der Papier-Unterschriften konnten nicht angefügt werden: ' + e.message); return; }
   app.pending = pending;
   download(currentPdf(), pdfFileName(app.cur, 'zur_Signatur'));
   rerender();
@@ -1013,16 +1249,24 @@ async function acceptSignedPdf(file) {
   const prev = await blobBytes(currentPdf());
   const sigs = countSignatures(bytes), prevSigs = countSignatures(prev);
   if (sigs <= prevSigs) throw new Error('Im PDF ist keine neue Signatur. Bitte das signierte PDF aus dem Signaturdienst wählen.');
+  const pr = await pruefeSignaturen(bytes), neu = pr[pr.length - 1];
+  if (!neu || neu.fehler || !neu.ganzeDatei || !neu.inhaltOk || neu.signaturOk === false)
+    throw new Error(`Die neue Signatur ist nicht in Ordnung (${neu ? (neu.fehler || (!neu.ganzeDatei ? 'deckt nicht das ganze Dokument ab' : sigUrteil(neu))) : 'nicht gefunden'}). Bitte nochmals signieren.`);
+  const erwartet = pd.leiter ? v.meta.leiter : (b.vertreten && !b.anwesend && b.vertreter.name ? b.vertreter.name : b.name);
+  const sigInfo = { name: neu.name, zeit: neu.zeit, urteil: sigUrteil(neu), passt: namePasst(neu.name, erwartet), erwartet };
   // PAdES hängt Signaturen inkrementell an: das bisherige PDF bleibt Byte für Byte am Anfang erhalten.
   let unchanged = bytes.length > prev.length;
   for (let i = 0; unchanged && i < prev.length; i++) if (bytes[i] !== prev[i]) unchanged = false;
-  v.signed = { pdf: new Blob([bytes], { type: 'application/pdf' }), zeit: Date.now(), sigCount: sigs, inkrementell: unchanged };
-  if (pd.leiter) v.leiterSig = { art: 'qes', zeit: Date.now() }; else b.zustimmung = { art: 'qes', zeit: Date.now() };
+  v.signed = { pdf: new Blob([bytes], { type: 'application/pdf' }), zeit: Date.now(), sigCount: sigs, inkrementell: unchanged,
+    pruefung: pr.map(x => ({ name: x.name, zeit: x.zeit, urteil: sigUrteil(x), aussteller: x.aussteller || '' })) };
+  if (pd.leiter) v.leiterSig = { art: 'qes', zeit: Date.now(), sig: sigInfo }; else b.zustimmung = { art: 'qes', zeit: Date.now(), sig: sigInfo };
+  if (!sigInfo.passt) logEvent(`Achtung: signiert hat „${neu.name}“, erwartet war „${erwartet}“`);
   logEvent(`${pd.leiter ? `Verhandlungsleiter ${v.meta.leiter}` : b.name}: QES übernommen (${sigs} Signatur(en) im PDF, ${unchanged ? 'Inhalt unverändert angehängt' : 'Datei neu geschrieben, Inhalt bitte prüfen'})`);
   app.pending = null;
   updateStatus();
   await touch(true);
-  toast(unchanged ? 'Signatur übernommen, gesperrter Inhalt unverändert' : 'Signatur übernommen. Achtung: Datei wurde neu geschrieben.');
+  toast(!sigInfo.passt ? `Signatur übernommen, aber signiert hat „${neu.name}“ statt „${erwartet}“. Bitte prüfen.`
+    : unchanged ? `Signatur von ${neu.name} geprüft: gültig, Inhalt unverändert` : 'Signatur übernommen. Achtung: Datei wurde neu geschrieben.');
   rerender();
 }
 function qesPanel() {
@@ -1035,7 +1279,9 @@ function qesPanel() {
     h('ol', { class: 'steps-visual' },
       h('li', {}, h('strong', {}, 'PDF ist gespeichert'), h('span', { class: 'muted' }, 'Liegt in den Downloads des Tablets.'),
         h('button', { class: 'btn small', type: 'button', onclick: () => download(currentPdf(), pdfFileName(v, 'zur_Signatur')) }, 'Nochmals speichern')),
-      h('li', {}, h('strong', {}, 'Signieren mit ID Austria'), h('span', { class: 'muted' }, 'Im Signaturdienst das PDF wählen. Die Person bestätigt am eigenen Smartphone.'),
+      h('li', {}, h('strong', {}, 'Signieren mit ID Austria'), h('span', { class: 'muted' }, sigSeite(v)
+          ? `Im Signaturdienst das PDF wählen, als Position „QR-Platzhalter“ und die Nummer ${sigNr(v, pd.leiter ? null : personById(pd.bid))} eingeben. Die Person bestätigt am eigenen Smartphone.`
+          : 'Im Signaturdienst das PDF wählen. Die Person bestätigt am eigenen Smartphone.'),
         h('a', { class: 'btn small', href: EGIZ_URL, target: '_blank', rel: 'noopener' }, 'Signaturdienst öffnen')),
       h('li', {}, h('strong', {}, 'Signiertes PDF zurückholen'), h('span', { class: 'muted' }, 'Die App prüft, ob der Inhalt unverändert ist.'),
         h('button', { class: 'btn small primary', type: 'button', onclick: () => $('#file-signed').click() }, 'Signiertes PDF wählen'))),
@@ -1143,13 +1389,16 @@ VIEWS.zustimmung = page => {
         sigImg = h('img', { class: 'sig-thumb', alt: `Unterschrift ${b.name}` });
         sigImg.src = URL.createObjectURL(b.zustimmung.png);
       }
-      return h('div', { class: 'card owner' },
+      const zOk = b.zustimmung.art !== 'offen';
+      return h('div', { class: 'card owner ' + (zOk ? 'st-ok' : 'st-open') },
         h('div', { class: 'who', style: 'display:flex;gap:14px;align-items:center;min-width:0' },
           h('div', { class: 'stack', style: 'gap:2px;min-width:0' },
-            h('strong', {}, b.name || 'ohne Namen'),
+            h('strong', {}, h('span', { class: 'stmark ' + (zOk ? 'ok' : 'open') }, zOk ? '✓' : '!'), b.name || 'ohne Namen'),
             h('span', { class: 'muted' }, `EZ ${b.ez || '–'} · Gst. ${b.gst || '–'} · ${b.anwesend ? 'anwesend' : b.vertreten ? `vertreten durch ${b.vertreter.name || '…'}` : 'nicht anwesend'}`),
             h('span', {}, h('span', { class: 'pill ' + z.cls }, z.label), b.zustimmung.zeit ? h('span', { class: 'muted' }, '  ' + timeOf(b.zustimmung.zeit) + ' Uhr') : null),
-            sigImg)),
+            sigZeile(b.zustimmung.sig),
+            sigImg,
+            b.zustimmung.art === 'papier' ? papierFotoZeile(b) : null)),
         h('div', { class: 'actions' },
           v.leiterSig ? null : b.zustimmung.art === 'offen' ? [
             h('button', { class: 'btn primary', type: 'button', disabled: !!app.pending, onclick: () => startQes({ bid: b.id }) }, 'ID Austria'),
@@ -1164,16 +1413,33 @@ VIEWS.zustimmung = page => {
       hasStift(v) ? h('button', { class: 'btn', type: 'button', onclick: async e => { const bt = e.currentTarget; bt.disabled = true; try { Viewer.open({ blob: await protocolWithSignatures(v), title: 'Protokoll mit Stift-Unterschriften (Information)' }); } catch (err) { toast(err.message); } bt.disabled = false; } }, icon('pdf'), 'Protokoll mit Stift-Unterschriften ansehen') : null));
 };
 
+function papierFotoZeile(b) {
+  const v = app.cur, z = b.zustimmung;
+  const inp = h('input', { type: 'file', accept: 'image/*', capture: 'environment', hidden: true, onchange: e => { const f = e.target.files[0]; e.target.value = ''; if (f) papierFoto(b, f); } });
+  if (!z.foto) return h('span', { class: 'row', style: 'gap:8px;margin-top:4px' },
+    h('button', { class: 'btn small', type: 'button', onclick: () => inp.click() }, icon('camera'), 'Unterschrift fotografieren'), inp,
+    h('span', { class: 'muted', style: 'font-size:.82rem' }, v.signed ? 'geht als nachgereichte Unterschrift in eigener Datei ins Büro' : 'kommt vor der ersten ID-Austria-Signatur als Beilage ins Protokoll'));
+  const u = URL.createObjectURL(z.foto);
+  return h('span', { class: 'row vm-foto', style: 'gap:8px;margin-top:4px' },
+    h('button', { class: 'vm-thumb', type: 'button', 'aria-label': 'Foto der Unterschrift groß ansehen', onclick: () => lightbox(u) }, h('img', { src: u, alt: `Unterschrift ${b.name} auf Papier` })),
+    h('span', { class: 'muted', style: 'font-size:.85rem' }, z.fotoImPdf ? 'im Protokoll als Beilage „Unterschriften auf Papier“' : v.signed ? 'nachgereicht: eigene Datei im Export' : 'wird vor der ersten QES bzw. beim Export ans Protokoll angehängt'),
+    z.fotoImPdf ? null : h('button', { class: 'btn small ghost', type: 'button', onclick: async () => { if (!confirm('Foto entfernen?')) return; z.foto = null; logEvent(`${b.name}: Foto der Papier-Unterschrift entfernt`); await touch(true); rerender(); } }, 'Entfernen'));
+}
+function sigZeile(sig) {
+  if (!sig) return null;
+  return h('span', { class: 'sig-check' + (sig.passt ? '' : ' warn') }, sig.passt ? icon('check') : '! ',
+    `signiert von ${sig.name || 'unbekannt'} · ${sig.urteil}${sig.passt ? '' : ` · Name passt nicht zu „${sig.erwartet}“`}`);
+}
 /* Verhandlungsleiter unterfertigt als Letzter: seine QES umfasst das Protokoll samt allen Signaturen davor */
 function leiterCard() {
   const v = app.cur, ow = owners(v);
   const offen = ow.filter(b => b.zustimmung.art === 'offen').length, sig = v.leiterSig;
   const set = async art => { v.leiterSig = art ? { art, zeit: Date.now() } : null; logEvent(art ? `Verhandlungsleiter ${v.meta.leiter}: ${art === 'qes' ? 'QES' : 'Unterschrift auf Papier'}` : 'Unterfertigung des Verhandlungsleiters zurückgesetzt'); updateStatus(); await touch(true); rerender(); };
-  return h('div', { class: 'card owner leiter' },
+  return h('div', { class: 'card owner leiter ' + (sig ? 'st-ok' : 'st-open') },
     h('div', { class: 'stack', style: 'gap:2px;min-width:0' },
       h('span', { class: 'eyebrow' }, 'Zum Schluss'),
       h('strong', {}, `Verhandlungsleiter: ${v.meta.leiter || '…'}`),
-      sig ? h('span', {}, h('span', { class: 'pill good' }, sig.art === 'qes' ? 'QES mit ID Austria' : 'Unterschrift auf Papier'), h('span', { class: 'muted' }, '  ' + timeOf(sig.zeit) + ' Uhr'))
+      sig ? h('span', {}, h('span', { class: 'pill good' }, sig.art === 'qes' ? 'QES mit ID Austria' : 'Unterschrift auf Papier'), h('span', { class: 'muted' }, '  ' + timeOf(sig.zeit) + ' Uhr'), sigZeile(sig.sig))
         : h('span', { class: 'muted' }, offen ? `Erst wenn alle Eigentümer erfasst sind (noch ${offen} offen).` : 'Signiert als Letzter. Die Signatur umfasst das Protokoll mit allen Signaturen davor.')),
     h('div', { class: 'actions' },
       sig ? (sig.art === 'papier' ? h('button', { class: 'btn small ghost', type: 'button', onclick: () => set(null) }, 'Zurücksetzen') : null) : [
@@ -1188,7 +1454,11 @@ function exportJson(v) {
     app: 'Digitale Grenzverhandlung', version: APP_VERSION, gz: v.gz, meta: v.meta, protokollVersion: v.version,
     gesperrt: v.locked ? { zeit: new Date(v.locked.zeit).toISOString(), sha256: v.locked.hash } : null,
     verhandlungsleiter: v.leiterSig ? { name: v.meta.leiter, art: v.leiterSig.art, zeit: new Date(v.leiterSig.zeit).toISOString() } : null,
-    beteiligte: v.beteiligte.map(({ id, ...b }) => ({ ...b, zustimmung: { art: b.zustimmung.art, zeit: b.zustimmung.zeit ? new Date(b.zustimmung.zeit).toISOString() : null, stiftUnterschrift: !!b.zustimmung.png } })),
+    signaturen: v.signed && v.signed.pruefung ? v.signed.pruefung.map(x => ({ ...x, zeit: x.zeit ? new Date(x.zeit).toISOString() : null })) : [],
+    beteiligte: v.beteiligte.map(({ id, vollmachtFoto, ...b }) => ({ ...b, vollmachtFoto: !!vollmachtFoto,
+      vertreter: b.vertreter ? { ...b.vertreter, vollmachtFoto: !!b.vertreter.vollmachtFoto } : b.vertreter,
+      zustimmung: { art: b.zustimmung.art, zeit: b.zustimmung.zeit ? new Date(b.zustimmung.zeit).toISOString() : null, stiftUnterschrift: !!b.zustimmung.png,
+        fotoPapier: b.zustimmung.foto ? (b.zustimmung.fotoImPdf ? 'Beilage im Protokoll' : nachName(v, b)) : null } })),
     behelfe: v.behelfe.map(b => ({ planverfasser: b.planverfasser, geschaeftszahl: b.gz, anmerkung: b.anmerkung, vorgehalten: b.vorgehalten })),
     beschreibung: v.beschreibung,
     fotos: v.fotos.map((f, i) => ({ datei: fotoName(v, f, i), zeit: new Date(f.zeit).toISOString(), notiz: f.notiz || '' })),
@@ -1197,12 +1467,16 @@ function exportJson(v) {
   };
 }
 const fotoName = (v, f, i) => `fotos/GZ${safeName(v.gz)}_Foto_${pad2(i + 1)}_${timeOf(f.zeit).replace(':', '')}.jpg`;
+const nachName = (v, b) => `Unterschriften_nachgereicht/GZ${safeName(v.gz)}_${safeName(b.name)}${b.ez ? `_EZ${safeName(b.ez)}` : ''}.jpg`;
 async function exportZip(v) {
+  await papierInsPdf(v);
   const zip = new JSZip();
+  for (const b of papierOffen(v)) zip.file(nachName(v, b), b.zustimmung.foto);
   zip.file(pdfFileName(v, v.signed ? 'signiert' : 'gesperrt'), await currentPdf().arrayBuffer());
   if (hasStift(v)) zip.file(pdfFileName(v, 'mit_Stift-Unterschriften_Information'), await (await protocolWithSignatures(v)).arrayBuffer());
   zip.file(`Verhandlung_${safeName(v.gz)}_V${v.version}.json`, JSON.stringify(exportJson(v), null, 2));
   v.fotos.forEach((f, i) => zip.file(fotoName(v, f, i), f.blob));
+  if (v.skizze.pdf && v.fotos.some(f => f.pos)) zip.file(`fotos/Fotoplan_GZ${safeName(v.gz)}.pdf`, await buildFotoplan(v));
   if (v.fotos.length) zip.file('fotos/Fotos.txt', v.fotos.map((f, i) => `${fotoName(v, f, i).slice(6)}\t${deDateTime(f.zeit)}\t${f.notiz || ''}`).join('\r\n'));
   for (const u of v.unterlagen.filter(x => x.lokal)) zip.file(`vor_Ort_ergaenzt/${safeName(u.titel)}.pdf`, await u.pdf.arrayBuffer());
   return zip.generateAsync({ type: 'blob' });
@@ -1222,13 +1496,17 @@ VIEWS.export = page => {
         h('tr', {}, h('th', {}, 'Zustimmungen'), h('td', {}, `${cnt('qes')} QES · ${cnt('papier')} Papier · ${cnt('stift')} Stift (Information) · ${cnt('verweigert')} verweigert · ${cnt('offen')} offen`)),
         h('tr', {}, h('th', {}, 'Verhandlungsleiter'), h('td', {}, v.leiterSig ? `${v.leiterSig.art === 'qes' ? 'QES' : 'Papier'}, ${deDateTime(v.leiterSig.zeit)}` : 'offen')),
         h('tr', {}, h('th', {}, 'Signaturen im PDF'), h('td', {}, v.signed ? String(v.signed.sigCount) : '0')))),
+      v.signed && v.signed.pruefung ? h('div', { class: 'stack', style: 'gap:6px' }, h('strong', {}, 'Signaturen im Protokoll (in der App geprüft)'),
+        h('ol', { class: 'sig-list' }, v.signed.pruefung.map(x => h('li', {}, h('b', {}, x.name || 'unbekannt'), ` · ${x.zeit ? deDateTime(x.zeit) : 'ohne Zeit'} · ${x.urteil}${x.aussteller ? ` · Zertifikat: ${x.aussteller}` : ''}`))),
+        h('p', { class: 'muted', style: 'margin:0;font-size:.85rem' }, 'Geprüft: Unterzeichner, Zeitpunkt, unveränderter Inhalt und die Signatur selbst. Ob das Zertifikat vertrauenswürdig und nicht widerrufen ist, im Büro mit der ',
+          h('a', { href: 'https://www.signaturpruefung.gv.at/', target: '_blank', rel: 'noopener' }, 'RTR-Signaturprüfung'), ' kontrollieren.')) : null,
       cnt('offen') ? notice('', 'warn', h('span', {}, `${cnt('offen')} Zustimmung(en) sind noch offen.`)) : notice('good', 'check', h('span', {}, 'Alle Eigentümer sind erfasst.')),
       v.leiterSig ? notice('good', 'check', h('span', {}, `Verhandlungsleiter: ${v.leiterSig.art === 'qes' ? 'QES mit ID Austria' : 'Unterschrift auf Papier'} um ${timeOf(v.leiterSig.zeit)} Uhr.`))
         : notice('', 'warn', h('span', {}, 'Der Verhandlungsleiter hat noch nicht unterfertigt (Schritt „Zustimmung“, ganz unten).')),
       cnt('stift') ? notice('info', 'info', h('span', {}, `${cnt('stift')} Zustimmung(en) nur mit dem Stift: Für die Schriftform braucht es zusätzlich eine QES oder eine Unterschrift auf Papier.`)) : null,
       h('div', { class: 'row' },
         h('button', { class: 'btn primary big', type: 'button', onclick: async e => { const b = e.currentTarget; b.disabled = true; try { download(await exportZip(v), `Grenzverhandlung_${safeName(v.gz)}_V${v.version}.zip`); logEvent('Paket für die Kanzlei exportiert'); touch(true); } catch (err) { toast(err.message); } b.disabled = false; } }, icon('export'), 'Alles für die Kanzlei (ZIP)'),
-        h('button', { class: 'btn', type: 'button', onclick: () => download(currentPdf(), pdfFileName(v, v.signed ? 'signiert' : 'gesperrt')) }, icon('pdf'), v.signed ? 'Signiertes Protokoll' : 'Gesperrtes Protokoll'),
+        h('button', { class: 'btn', type: 'button', onclick: async () => { await papierInsPdf(v).catch(err => toast(err.message)); download(currentPdf(), pdfFileName(v, v.signed ? 'signiert' : 'gesperrt')); } }, icon('pdf'), v.signed ? 'Signiertes Protokoll' : 'Gesperrtes Protokoll'),
         hasStift(v) ? h('button', { class: 'btn', type: 'button', onclick: async e => { const b = e.currentTarget; b.disabled = true; try { download(await protocolWithSignatures(v), pdfFileName(v, 'mit_Stift-Unterschriften_Information')); } catch (err) { toast(err.message); } b.disabled = false; } }, icon('pen'), 'Protokoll mit Stift-Unterschriften') : null,
         h('button', { class: 'btn', type: 'button', onclick: () => download(new Blob([JSON.stringify(exportJson(v), null, 2)], { type: 'application/json' }), `Verhandlung_${safeName(v.gz)}_V${v.version}.json`) }, 'Verhandlungsdaten (JSON)'))));
   }
@@ -1263,6 +1541,99 @@ async function getLogoBytes() {
 
 /* Protokoll nach der Vorlage der Kanzlei (3 Seiten A4, Skizze als Beilage).
  * opts.unterschriften: Stift-Unterschriften in die Spalte „Unterschrift“ übernehmen (nur Information). */
+/* Ergänzungen vor Ort auf eine kopierte Seite der Begehungsskizze zeichnen (Protokoll-Beilage und Fotoplan) */
+function drawSketchInk(p, v, idx, FB) {
+  const { LineCapStyle } = PDFLib;
+  const mb = p.getMediaBox();
+  const ph = mb.height;
+  const toPdf = (x, yy) => ({ x: mb.x + x, y: mb.y + ph - yy });
+  for (const s of v.skizze.strokes.filter(s => s.page === idx + 1)) {
+    const c = hexRgb(s.color);
+    if (s.points.length === 1) { const p0 = toPdf(...s.points[0]); p.drawCircle({ x: p0.x, y: p0.y, size: s.width / 2, color: c }); continue; }
+    const d = s.points.map(([x, yy], i) => `${i ? 'L' : 'M'}${x.toFixed(2)} ${yy.toFixed(2)}`).join(' ');
+    p.drawSvgPath(d, { x: mb.x, y: mb.y + ph, borderColor: c, borderWidth: s.width, borderLineCap: LineCapStyle.Round, borderDashArray: s.dash ? dashOf(s.width) : undefined });
+  }
+  for (const t of v.skizze.texts.filter(t => t.page === idx + 1)) {
+    const pos = toPdf(t.x, t.y);
+    p.drawText(ansi(t.text), { x: pos.x, y: pos.y, size: t.size, font: FB, color: hexRgb(t.color) });
+  }
+  for (const s of v.skizze.symbols.filter(s => s.page === idx + 1)) {
+    const c = hexRgb(s.color), pos = toPdf(s.x, s.y), r = s.r, bw = Math.max(0.4, r * 0.28);
+    if (s.code === 'GS') p.drawRectangle({ x: pos.x - r, y: pos.y - r, width: 2 * r, height: 2 * r, borderColor: c, borderWidth: bw });
+    else p.drawCircle({ x: pos.x, y: pos.y, size: r, borderColor: c, borderWidth: bw });
+    p.drawCircle({ x: pos.x, y: pos.y, size: r * 0.3, color: c });
+    const lp = toPdf(s.x + r * 1.35, s.y + r * 0.5);
+    p.drawText(s.code, { x: lp.x, y: lp.y, size: r * 1.5, font: FB, color: c });
+  }
+}
+/* Fotoplan: Skizze mit Standort und Blickrichtung der verorteten Fotos, dahinter die Fotos. Nicht Teil des Protokolls. */
+async function buildFotoplan(v) {
+  const { PDFDocument, StandardFonts, rgb } = PDFLib;
+  const doc = await PDFDocument.create();
+  doc.setTitle(`Fotoplan ${v.gz}`); doc.setProducer(`Digitale Grenzverhandlung ${APP_VERSION} (Prototyp)`);
+  const F = await doc.embedFont(StandardFonts.Helvetica), FB = await doc.embedFont(StandardFonts.HelveticaBold);
+  const orange = hexRgb(FOTO_FARBE), white = rgb(1, 1, 1);
+  const placed = v.fotos.map((f, i) => ({ f, nr: i + 1 })).filter(x => x.f.pos);
+  if (!v.skizze.pdf || !placed.length) throw new Error('Noch kein Foto in der Skizze verortet.');
+  const src = await PDFDocument.load(await blobBytes(v.skizze.pdf), { ignoreEncryption: true });
+  const copied = await doc.copyPages(src, src.getPageIndices());
+  copied.forEach((p, idx) => {
+    doc.addPage(p);
+    drawSketchInk(p, v, idx, FB);
+    const mb = p.getMediaBox(), ph = mb.height, toPdf = (x, y) => ({ x: mb.x + x, y: mb.y + ph - y });
+    for (const { f, nr } of placed.filter(x => x.f.pos.page === idx + 1)) {
+      const m = { ...f.pos, nr }, { r, cone } = fotoMarkGeom(m);
+      if (cone) p.drawSvgPath(`M${cone[0][0]} ${cone[0][1]} L${cone[1][0]} ${cone[1][1]} L${cone[2][0]} ${cone[2][1]} Z`, { x: mb.x, y: mb.y + ph, color: orange, opacity: 0.3, borderColor: orange, borderWidth: r * 0.18 });
+      const c = toPdf(m.x, m.y), t = String(nr), sz = r * 1.15;
+      p.drawCircle({ x: c.x, y: c.y, size: r, color: white, borderColor: orange, borderWidth: r * 0.25 });
+      p.drawText(t, { x: c.x - FB.widthOfTextAtSize(t, sz) / 2, y: c.y - sz * 0.36, size: sz, font: FB, color: orange });
+    }
+    const label = ansi(`Fotoplan zu Projekt ${v.gz}: Standorte und Blickrichtungen der Fotos (nicht Teil des Protokolls)${copied.length > 1 ? ` · Blatt ${idx + 1} von ${copied.length}` : ''}`);
+    p.drawRectangle({ x: mb.x + 8, y: mb.y + 6, width: F.widthOfTextAtSize(label, 8) + 8, height: 13, color: white, opacity: 0.85 });
+    p.drawText(label, { x: mb.x + 12, y: mb.y + 9.5, size: 8, font: F, color: orange });
+  });
+  for (const { f, nr } of placed) {
+    const richtung = f.pos.dir === null || f.pos.dir === undefined ? 'ohne Blickrichtung' : `Blickrichtung ${['Ost', 'Südost', 'Süd', 'Südwest', 'West', 'Nordwest', 'Nord', 'Nordost'][((Math.round(f.pos.dir / (Math.PI / 4)) % 8) + 8) % 8]} (bezogen auf das Blatt)`;
+    await fotoBeilage(doc, F, f.blob, `Fotoplan ${v.gz} · Foto ${nr} · ${deDateTime(f.zeit)} · Blatt ${f.pos.page}, ${richtung}${f.notiz ? ` · ${f.notiz}` : ''}`);
+  }
+  return doc.save();
+}
+/* QR-Code als PNG (für die Signaturplatzhalter) */
+function qrPng(text) {
+  const q = qrcode(0, 'M'); q.addData(text); q.make();
+  const n = q.getModuleCount(), cell = 8, pad = 4, size = (n + 2 * pad) * cell;
+  const c = document.createElement('canvas'); c.width = c.height = size;
+  const ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, size, size); ctx.fillStyle = '#000';
+  for (let r = 0; r < n; r++) for (let k = 0; k < n; k++) if (q.isDark(r, k)) ctx.fillRect((k + pad) * cell, (r + pad) * cell, cell, cell);
+  const b64 = c.toDataURL('image/png').split(',')[1];
+  return Uint8Array.from(atob(b64), ch => ch.charCodeAt(0));
+}
+/* Foto als eigene A4-Seite (Beilage) anhängen; JPEG oder PNG */
+async function fotoBeilage(doc, F, blob, label) {
+  const bytes = await blobBytes(blob);
+  let img;
+  if (bytes[0] === 0xff && bytes[1] === 0xd8) img = await doc.embedJpg(bytes);
+  else if (bytes[0] === 0x89 && bytes[1] === 0x50) img = await doc.embedPng(bytes);
+  else return false;
+  const W = 595.28, H = 841.89, M = 36, top = 40;
+  const page = doc.addPage([W, H]);
+  const lines = wrapText(ansi(label), F, 9, W - 2 * M);
+  lines.forEach((ln, i) => page.drawText(ln, { x: M, y: H - M - 9 - i * 12, size: 9, font: F, color: PDFLib.rgb(0.25, 0.25, 0.25) }));
+  const aw = W - 2 * M, ah = H - 2 * M - top - lines.length * 12;
+  const k = Math.min(aw / img.width, ah / img.height);
+  const w = img.width * k, hh = img.height * k;
+  page.drawImage(img, { x: (W - w) / 2, y: M + (ah - hh) / 2, width: w, height: hh });
+  return true;
+}
+function wrapText(text, font, size, maxW) {
+  const out = []; let line = '';
+  for (const word of text.split(/\s+/).filter(Boolean)) {
+    const t = line ? line + ' ' + word : word;
+    if (font.widthOfTextAtSize(t, size) <= maxW || !line) line = t; else { out.push(line); line = word; }
+  }
+  if (line) out.push(line);
+  return out;
+}
 async function buildProtocol(v, opts = {}) {
   const { PDFDocument, StandardFonts, rgb, LineCapStyle } = PDFLib;
   const doc = await PDFDocument.create();
@@ -1363,10 +1734,10 @@ async function buildProtocol(v, opts = {}) {
   centered('und § 52 Z 5 VermG', 9, FB, 0);
   y -= 10;
   heading('Verzeichnis der Eigentümer, allfälliger Vertreter und anwesender Personen');
-  para(`Die Verhandlung über den Grenzverlauf wird am ${deDate(v.meta.datum) || '……………'} um ${v.meta.eroeffnung || '. . . . . . . .'} Uhr in ${ortKurz || '…'} eröffnet. Der Verhandlungsleiter überzeugt sich von der Persönlichkeit der anwesenden Personen und prüft die Vertretungsbefugnis.`);
+  para(eroeffnungsText(v)[0]);
   y -= 10;
   heading('Gegenstand der Verhandlung');
-  para('Der Verhandlungsleiter legt den Gegenstand der Grenzverhandlung dar, der die Festlegung der Grenzen der in der Beschreibung des Grenzverlaufs näher bezeichneten Grundstücke betrifft und hält folgende Behelfe vor:', { justify: true, gap: 10 });
+  para(eroeffnungsText(v)[1], { justify: true, gap: 10 });
   const vb = v.behelfe.filter(b => b.vorgehalten).map(b => [b.planverfasser, b.gz, b.anmerkung]);
   while (vb.length < 5) vb.push(['', '', '']); // Leerzeilen wie in der Vorlage, soweit Platz ist
   table([{ t: 'Planverfasser', w: 0.377 }, { t: 'Geschäftszahl', w: 0.181 }, { t: 'Anmerkung', w: 0.442 }], vb,
@@ -1406,7 +1777,7 @@ async function buildProtocol(v, opts = {}) {
     return { qes: 'QES (ID Austria)', papier: 'Unterschrift auf Papier', verweigert: 'verweigert', offen: '' }[z] || '';
   };
   // Vertreter und Vollmacht beim vertretenen Eigentümer vermerken (die Tabelle der Anwesenden entfällt laut Vorlage)
-  const vtext = x => `vertreten durch ${x.name}${x.idnachweis ? ` (ID: ${x.idnachweis})` : ''}${x.vollmacht ? `, ${x.vollmacht}` : ''}`;
+  const vtext = x => `vertreten durch ${x.name}${x.idnachweis ? ` (ID: ${x.idnachweis})` : ''}${x.vollmacht ? `, ${x.vollmacht}` : ''}${x.vollmachtFoto ? ' (Beilage)' : ''}`;
   const vertreterVon = b => [b.vertreten && !b.anwesend && b.vertreter.name.trim() ? vtext(b.vertreter) : '',
     ...v.beteiligte.filter(x => x.rolle === 'Vertreter' && x.anwesend && x.vertritt && b.name.toLowerCase().includes(x.vertritt.toLowerCase())).map(vtext)].filter(Boolean).join('; ');
   const rows = ow.map(b => [b.ez, b.gst.split(/,\s*/).join('\n'), `${b.name}\n${b.anschrift.split(/,\s*/).join('\n')}`, cellSig(b),
@@ -1426,6 +1797,30 @@ async function buildProtocol(v, opts = {}) {
   page.drawText('Der Verhandlungsleiter', { x: W - M - 110, y: y - 10, size: 8.5, font: F });
   page.drawText(ansi(v.meta.leiter || ''), { x: W - M - 110, y: y - 22, size: 8.5, font: F });
   y -= 30;
+  /* Signaturseite: je Eigentümer und für den Verhandlungsleiter ein Feld mit QR-Platzhalter (PDF-AS: „PDF-AS-POS;id=n“).
+     Der Signaturdienst setzt den Signaturblock (80 x 29 mm) genau an diese Stelle. */
+  if (sigSeite(v) && opts.sigSeite !== false) {
+    newPage();
+    centered('Qualifizierte elektronische Signaturen', 12, FB, 0.6);
+    para('Die Eigentümer oder ihre Vertreter und der Verhandlungsleiter können anstelle der eigenhändigen Unterschrift mit ID Austria qualifiziert elektronisch signieren (§ 4 Abs. 1 SVG). Jede Person signiert im Feld mit ihrer Nummer; der Verhandlungsleiter zuletzt. Leer gebliebene Felder bedeuten: Zustimmung auf Papier oder keine Zustimmung.', { size: 8.5, justify: true, gap: 10 });
+    const fw = 200, fh = 72, rowH = 92, felder = [...ow.map((b, i) => [i + 1, b.name, [b.ez && `EZ ${b.ez}`, b.gst && `Gst. ${b.gst}`].filter(Boolean).join(', '), b.vertreten && !b.anwesend && b.vertreter.name ? `vertreten durch ${b.vertreter.name}` : '']),
+      [ow.length + 1, v.meta.leiter || 'Verhandlungsleiter', 'Verhandlungsleiter', '']];
+    for (const [nr, name, zeile2, zeile3] of felder) {
+      ensure(rowH);
+      const top = y, x2 = W - M - fw;
+      page.drawRectangle({ x: M, y: top - rowH + 6, width: W - 2 * M, height: rowH - 6, borderColor: rgb(0.6, 0.6, 0.6), borderWidth: 0.5 });
+      page.drawText(`${nr}`, { x: M + 8, y: top - 24, size: 16, font: FB, color: black });
+      let ty = top - 16;
+      for (const [t, f, sz] of [[name, FB, 9.5], [zeile2, F, 8.5], [zeile3, F, 8.5]]) {
+        if (!t) continue;
+        for (const ln of wrap(t, f, sz, x2 - M - 50)) { page.drawText(ln, { x: M + 36, y: ty - sz, size: sz, font: f, color: black }); ty -= sz * 1.3; }
+      }
+      const qr = await doc.embedPng(qrPng(`PDF-AS-POS;id=${nr}`));
+      page.drawImage(qr, { x: x2 - 6, y: top - 10 - fh, width: fw, height: fh, opacity: 0.4 });
+      y = top - rowH;
+    }
+    para('Die Felder mit dem QR-Code sind Platzhalter für den Signaturdienst (pdf.egiz.gv.at, Position „QR-Platzhalter“, Nummer laut Feld).', { size: 7, color: grey, gap: 0 });
+  }
   const protoPages = pages.length;
 
   /* Beilage: Skizze mit Ergänzungen */
@@ -1434,31 +1829,18 @@ async function buildProtocol(v, opts = {}) {
     const copied = await doc.copyPages(src, src.getPageIndices());
     copied.forEach((p, idx) => {
       doc.addPage(p); pages.push(p);
+      drawSketchInk(p, v, idx, FB);
       const mb = p.getMediaBox();
-      const ph = mb.height;
-      const toPdf = (x, yy) => ({ x: mb.x + x, y: mb.y + ph - yy });
-      for (const s of v.skizze.strokes.filter(s => s.page === idx + 1)) {
-        const c = hexRgb(s.color);
-        if (s.points.length === 1) { const p0 = toPdf(...s.points[0]); p.drawCircle({ x: p0.x, y: p0.y, size: s.width / 2, color: c }); continue; }
-        const d = s.points.map(([x, yy], i) => `${i ? 'L' : 'M'}${x.toFixed(2)} ${yy.toFixed(2)}`).join(' ');
-        p.drawSvgPath(d, { x: mb.x, y: mb.y + ph, borderColor: c, borderWidth: s.width, borderLineCap: LineCapStyle.Round, borderDashArray: s.dash ? dashOf(s.width) : undefined });
-      }
-      for (const t of v.skizze.texts.filter(t => t.page === idx + 1)) {
-        const pos = toPdf(t.x, t.y);
-        p.drawText(ansi(t.text), { x: pos.x, y: pos.y, size: t.size, font: FB, color: hexRgb(t.color) });
-      }
-      for (const s of v.skizze.symbols.filter(s => s.page === idx + 1)) {
-        const c = hexRgb(s.color), pos = toPdf(s.x, s.y), r = s.r, bw = Math.max(0.4, r * 0.28);
-        if (s.code === 'GS') p.drawRectangle({ x: pos.x - r, y: pos.y - r, width: 2 * r, height: 2 * r, borderColor: c, borderWidth: bw });
-        else p.drawCircle({ x: pos.x, y: pos.y, size: r, borderColor: c, borderWidth: bw });
-        p.drawCircle({ x: pos.x, y: pos.y, size: r * 0.3, color: c });
-        const lp = toPdf(s.x + r * 1.35, s.y + r * 0.5);
-        p.drawText(s.code, { x: lp.x, y: lp.y, size: r * 1.5, font: FB, color: c });
-      }
       const label = ansi(`Beilage zum Protokoll, Projekt ${v.gz}: Begehungsskizze mit Ergänzungen vor Ort${copied.length > 1 ? ` (Blatt ${idx + 1} von ${copied.length})` : ''}`);
       p.drawRectangle({ x: mb.x + 8, y: mb.y + 6, width: F.widthOfTextAtSize(label, 8) + 8, height: 13, color: rgb(1, 1, 1), opacity: 0.85 });
       p.drawText(label, { x: mb.x + 12, y: mb.y + 9.5, size: 8, font: F, color: grey });
     });
+  }
+
+  /* Beilagen: Fotos der Vollmachten (vor dem Sperren aufgenommen) */
+  for (const b of v.beteiligte) {
+    if (b.vertreten && !b.anwesend && b.vertreter.vollmachtFoto) await fotoBeilage(doc, F, b.vertreter.vollmachtFoto, `Beilage zum Protokoll, Projekt ${v.gz}: Vollmacht für ${b.name}, vertreten durch ${b.vertreter.name}`);
+    else if (b.rolle === 'Vertreter' && b.anwesend && b.vollmachtFoto) await fotoBeilage(doc, F, b.vollmachtFoto, `Beilage zum Protokoll, Projekt ${v.gz}: Vollmacht von ${b.name}${b.vertritt ? ` für ${b.vertritt}` : ''}`);
   }
 
   /* Briefkopf wie in der Vorlage: Logo, Kanzleizeile, Tabelle Vermessungsamt / KG / Seite / Projekt */
@@ -1491,13 +1873,16 @@ const Viewer = {
     document.body.style.overflow = 'hidden';
     $('#v-title').textContent = opts.title;
     $('#v-tools').hidden = !opts.editable;
+    st.hits = []; st.hit = -1; st.textCache = new Map();
+    $('#v-search').hidden = true; $('#v-searchbtn').setAttribute('aria-expanded', 'false'); $('#v-shits').textContent = ''; $('#v-sprev').disabled = $('#v-snext').disabled = true;
+    $('#v-searchbtn').hidden = !!opts.place;
     this.syncTools();
-    this.hint(opts.editable ? (penSeen ? 'Stift zeichnet · Finger verschiebt und zoomt' : 'Mit Stift oder Finger zeichnen · zwei Finger verschieben und zoomen') : 'Zwei Finger zoomen · ein Finger verschiebt');
+    if (opts.place) this.hint('Standort antippen und in Blickrichtung ziehen · zwei Finger zoomen'); else this.hint(opts.editable ? (penSeen ? 'Stift zeichnet · Finger verschiebt und zoomt' : 'Mit Stift oder Finger zeichnen · zwei Finger verschieben und zoomen') : 'Zwei Finger zoomen · ein Finger verschiebt');
     try {
       st.doc = await loadPdf(opts.blob);
       st.pages = st.doc.numPages;
       $('#v-pagenav').hidden = st.pages < 2;
-      await this.showPage(1);
+      await this.showPage(Math.min(opts.startPage || 1, st.pages));
     } catch (e) { toast('PDF konnte nicht geöffnet werden: ' + e.message); this.close(); }
   },
   hint(text) {
@@ -1596,12 +1981,28 @@ const Viewer = {
     const ink = $('#v-ink'), ctx = ink.getContext('2d');
     ctx.clearRect(0, 0, ink.width, ink.height);
     if (st.ink) paintInk(ctx, st.ink, st.page, ink.width / st.pw);
+    this.paintExtras(ctx, ink.width / st.pw);
     if (st.detail) {
       const dc = $('#v-detail').getContext('2d'), d = st.detail;
       dc.setTransform(1, 0, 0, 1, 0, 0); dc.drawImage(d.pdf, 0, 0);
       dc.setTransform(1, 0, 0, 1, -d.ox, -d.oy);
       if (st.ink) paintInk(dc, st.ink, st.page, d.k);
+      this.paintExtras(dc, d.k);
     }
+  },
+  /* Suchtreffer und Foto-Standorte (nur Anzeige, nicht Teil der Skizze im Protokoll) */
+  paintExtras(ctx, k) {
+    const st = this.st;
+    (st.hits || []).forEach((m, i) => {
+      if (m.page !== st.page) return;
+      ctx.fillStyle = i === st.hit ? 'rgba(255,140,0,.45)' : 'rgba(255,220,0,.4)';
+      ctx.fillRect(m.x * k, m.y * k, m.w * k, m.h * k);
+      if (i === st.hit) { ctx.strokeStyle = '#e8710a'; ctx.lineWidth = Math.max(1, 1.2 * k); ctx.strokeRect(m.x * k, m.y * k, m.w * k, m.h * k); }
+    });
+    let marks = st.fotoMarks ? st.fotoMarks() : [];
+    if (st.place) marks = marks.map(m => m.nr === st.place.nr ? { ...m, aktiv: true } : m);
+    if (st.placing) marks = marks.filter(m => m.nr !== st.place.nr).concat({ ...st.placing.mark, aktiv: true });
+    for (const m of marks) if (m.page === st.page) paintFotoMark(ctx, m, k, st.zoom);
   },
   toPage(e) {
     const st = this.st, r = $('#v-stage').getBoundingClientRect();
@@ -1667,6 +2068,13 @@ const Viewer = {
     const st = this.st; if (!st) return;
     try { $('#v-stage').setPointerCapture(e.pointerId); } catch (_) {}
     if (e.pointerType === 'pen' && !penSeen) { penSeen = true; try { localStorage.setItem('gv-pen', '1'); } catch (_) {} }
+    if (st.place) {
+      // Foto verorten: ein Finger/Stift setzt den Standort, Ziehen gibt die Blickrichtung; zwei Finger zoomen
+      st.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY }); st.gesture = null;
+      if (st.pointers.size === 1) { const p = this.toPage(e); st.placing = { id: e.pointerId, mark: { page: st.page, x: p[0], y: p[1], dir: null, nr: st.place.nr } }; }
+      else st.placing = null;
+      this.drawInk(); return;
+    }
     if (e.pointerType === 'pen' || (e.pointerType === 'mouse' && e.button === 0)) {
       if (st.editable && !st.drawing) this.startDraw(e);
       else if (!st.editable) { st.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY }); }
@@ -1685,6 +2093,11 @@ const Viewer = {
   },
   move(e) {
     const st = this.st; if (!st) return;
+    if (st.place && st.placing && st.placing.id === e.pointerId && st.pointers.size === 1) {
+      const p = this.toPage(e), m = st.placing.mark;
+      if (Math.hypot(p[0] - m.x, p[1] - m.y) * st.fit * st.zoom > 14) m.dir = Math.round(Math.atan2(p[1] - m.y, p[0] - m.x) * 1000) / 1000;
+      this.drawInk(); return;
+    }
     if (st.drawing && st.drawing.id === e.pointerId) {
       if (st.pointers.size > 1) return;
       const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
@@ -1730,6 +2143,12 @@ const Viewer = {
   },
   up(e) {
     const st = this.st; if (!st) return;
+    if (st.place && st.placing && st.placing.id === e.pointerId) {
+      const m = st.placing.mark; st.placing = null; st.pointers.delete(e.pointerId);
+      st.place.onSet({ page: m.page, x: Math.round(m.x * 10) / 10, y: Math.round(m.y * 10) / 10, dir: m.dir });
+      this.hint(m.dir === null ? 'Standort gesetzt. Für die Blickrichtung nochmals antippen und ziehen.' : 'Standort und Blickrichtung gespeichert · „Fertig“ schließt');
+      this.drawInk(); return;
+    }
     if (st.drawing && st.drawing.id === e.pointerId) this.finishDraw();
     st.pointers.delete(e.pointerId); st.gesture = null;
   },
@@ -1753,6 +2172,49 @@ const Viewer = {
     st.undo.push(this.state()); this.restore(st.redo.pop());
     this.syncHist(); this.drawInk(); this.changed();
   },
+  async pageText(n) {
+    const st = this.st;
+    if (st.textCache.has(n)) return st.textCache.get(n);
+    const pg = await st.doc.getPage(n), vp = pg.getViewport({ scale: 1 }), tc = await pg.getTextContent();
+    const items = tc.items.filter(it => it.str).map(it => {
+      const t = pdfjsLib.Util.transform(vp.transform, it.transform), fh = Math.hypot(t[2], t[3]) || 10;
+      return { str: it.str, x: t[4], y: t[5] - fh, w: it.width * vp.scale, h: fh * 1.2 };
+    });
+    st.textCache.set(n, items);
+    return items;
+  },
+  async search(q) {
+    const st = this.st; if (!st || !st.doc) return;
+    const norm = x => x.toLowerCase().replace(/\s+/g, ' ');
+    q = norm(q.trim());
+    st.hits = []; st.hit = -1;
+    if (q) for (let n = 1; n <= st.pages; n++) {
+      for (const it of await this.pageText(n)) {
+        const t = norm(it.str); let i = t.indexOf(q);
+        while (i >= 0) { const cw = it.w / Math.max(1, t.length); st.hits.push({ page: n, x: it.x + cw * i, y: it.y, w: Math.max(4, cw * q.length), h: it.h }); i = t.indexOf(q, i + q.length); }
+      }
+      if (this.st !== st) return;
+    }
+    const total = st.hits.length;
+    $('#v-sprev').disabled = $('#v-snext').disabled = total < 2;
+    if (!q) { $('#v-shits').textContent = ''; this.drawInk(); return; }
+    if (!total) {
+      const any = [...st.textCache.values()].some(a => a.length);
+      $('#v-shits').textContent = any ? 'kein Treffer' : 'kein Text im PDF (gescannt?)'; this.drawInk(); return;
+    }
+    await this.gotoHit(0);
+  },
+  async gotoHit(i) {
+    const st = this.st, n = st.hits.length; if (!n) return;
+    st.hit = (i + n) % n;
+    const m = st.hits[st.hit];
+    $('#v-shits').textContent = `${st.hit + 1} von ${n}`;
+    if (m.page !== st.page) await this.showPage(m.page);
+    const r = $('#v-stage').getBoundingClientRect();
+    st.zoom = Math.max(st.zoom, Math.min(4, 2.2 / st.fit));
+    st.tx = r.width / 2 - (m.x + m.w / 2) * st.fit * st.zoom; st.ty = r.height / 2 - (m.y + m.h / 2) * st.fit * st.zoom;
+    this.applyTransform(); this.drawInk(); this.scheduleRender();
+  },
   syncTools() {
     const st = this.st;
     $$('#v-tools [data-tool]').forEach(b => { b.classList.toggle('on', b.dataset.tool === st.tool); b.setAttribute('aria-pressed', String(b.dataset.tool === st.tool)); });
@@ -1762,7 +2224,7 @@ const Viewer = {
     $('#v-tools').style.setProperty('--cur', st.color);
     Viewer.pref = { tool: st.tool, color: st.color, weight: st.weight, dash: st.dash };
     this.syncHist();
-    $('#v-stage').style.cursor = st.editable ? 'crosshair' : 'grab';
+    $('#v-stage').style.cursor = st.editable || st.place ? 'crosshair' : 'grab';
   },
 };
 function initViewer() {
@@ -1784,10 +2246,15 @@ function initViewer() {
   $$('#v-tools [data-width]').forEach(b => b.onclick = () => { Viewer.st.weight = b.dataset.width; if (Viewer.st.tool === 'erase') Viewer.st.tool = 'pen'; Viewer.syncTools(); });
   $('#v-dash').onclick = () => { Viewer.st.dash = !Viewer.st.dash; if (Viewer.st.tool === 'erase') Viewer.st.tool = 'pen'; Viewer.syncTools(); };
   $('#v-redo').onclick = () => Viewer.redoLast();
+  $('#v-searchbtn').onclick = () => { const f = $('#v-search'), show = f.hidden; f.hidden = !show; $('#v-searchbtn').setAttribute('aria-expanded', String(show)); if (show) $('#v-q').focus(); else { Viewer.st.hits = []; $('#v-shits').textContent = ''; Viewer.drawInk(); } };
+  $('#v-search').onsubmit = e => { e.preventDefault(); $('#v-q').blur(); Viewer.search($('#v-q').value); };
+  $('#v-sprev').onclick = () => Viewer.gotoHit(Viewer.st.hit - 1);
+  $('#v-snext').onclick = () => Viewer.gotoHit(Viewer.st.hit + 1);
   window.addEventListener('resize', () => { if (Viewer.st) Viewer.showPage(Viewer.st.page); });
   document.addEventListener('keydown', e => {
     if (!Viewer.st) return;
-    if (e.key === 'Escape') Viewer.close();
+    if (e.key === 'Escape') { if (!$('#v-search').hidden && document.activeElement === $('#v-q')) { $('#v-searchbtn').click(); return; } Viewer.close(); }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') { e.preventDefault(); if ($('#v-search').hidden) $('#v-searchbtn').click(); else $('#v-q').focus(); }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? Viewer.redoLast() : Viewer.undoLast(); }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') { e.preventDefault(); Viewer.redoLast(); }
   });
