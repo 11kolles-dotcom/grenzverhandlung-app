@@ -329,3 +329,13 @@ summary { padding: 8px 0; }
 .quer-tipp { display: none; margin: 0; font-size: .85rem; font-weight: 600; color: var(--warn); }
 @media (max-width: 560px) and (orientation: portrait) { .quer-tipp { display: block; } }
 @media (max-width: 560px) { .start .gz-item .pill { white-space: normal; max-width: 100%; text-align: left; } }
+/* Fotos: Aktionen untereinander, volle Breite */
+.foto figcaption { display: flex !important; flex-direction: column; align-items: stretch; gap: 8px; padding: 10px; }
+.foto figcaption > * { width: 100%; }
+.foto .foto-act { justify-content: center; min-height: 42px; white-space: normal; text-align: center; }
+.foto .foto-act.verortet { background: var(--good-soft) !important; }
+.foto .foto-del { color: var(--crit); }
+.foto-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); }
+.foto-grid { flex: none !important; overflow: visible !important; grid-auto-rows: max-content; }
+.foto { overflow: visible; }
+.foto .foto-img { border-radius: 8px 8px 0 0; overflow: hidden; }
