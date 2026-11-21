@@ -370,3 +370,6 @@ $('#save').onclick = async () => {
 };
 state.bet.push({ rolle: 'Eigentümer', ez: '', gst: '', name: '', anschrift: '', vertritt: '' });
 drawBet(); check();
+
+/* Offline-Cache und Installierbarkeit als eigene Büro-App */
+if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
