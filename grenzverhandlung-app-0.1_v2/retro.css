@@ -360,3 +360,27 @@ summary { padding: 8px 0; }
 
 /* 0.9.11: Hintergrundbild am Startbildschirm ganz leicht weichzeichnen */
 .start::before { -webkit-backdrop-filter: blur(2.5px); backdrop-filter: blur(2.5px); }
+
+/* ---------- eKAT-Kopf: gleich in eKAT Field und eKAT Desk (eKAT links, ADP rechts) ---------- */
+.brand-row { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 16px; width: 100%; text-align: left; }
+.ekat { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; min-width: 0; }
+.ekat-logo { display: flex; align-items: flex-end; gap: 10px; }
+.ekat-logo img, .start-card .head .ekat-logo img { height: 40px; width: auto; max-width: none; display: block; }
+.ekat-app { font-size: 1.75rem; font-weight: 400; letter-spacing: .01em; color: var(--ink); line-height: .8; padding-bottom: 1px; }
+.ekat-sub { font-size: .72rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); line-height: 1.2; white-space: nowrap; }
+.brand-row img.adp, .start-card .head .brand-row img.adp { height: 40px; width: auto; max-width: 42%; flex: none; object-fit: contain; }
+.start-card .head { align-items: stretch; text-align: center; }
+.start-card .head .brand-row { padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+.start-card .head h1 { margin-top: 6px; }
+.start-card .foot { justify-content: center; }
+.start-card .empty { text-align: center; }
+@media (max-width: 560px) {
+  .brand-row { gap: 10px; }
+  .ekat { gap: 5px; }
+  .ekat-logo { gap: 7px; }
+  .ekat-logo img, .start-card .head .ekat-logo img { height: 30px; }
+  .ekat-app { font-size: 1.3rem; }
+  .ekat-sub { font-size: .6rem; letter-spacing: .08em; }
+  .brand-row img.adp, .start-card .head .brand-row img.adp { height: 28px; }
+  .start-card .foot .btn { flex: 1 1 100%; justify-content: center; }
+}

@@ -1,7 +1,8 @@
 {
   "id": "/grenzverhandlung-app/grenzverhandlung-app-0.1_v2/",
-  "name": "Grenzverhandlung – Außendienst",
-  "short_name": "Grenzverhandlung",
+  "name": "eKAT Field – Digitale Grenzverhandlung",
+  "short_name": "eKAT Field",
+  "description": "Digitale Grenzverhandlung vor Ort",
   "lang": "de-AT",
   "start_url": "./",
   "scope": "./",

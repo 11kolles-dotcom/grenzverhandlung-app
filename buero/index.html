@@ -3,7 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Paket erstellen</title>
+<title>eKAT Desk</title>
+<meta name="application-name" content="eKAT Desk">
+<meta name="apple-mobile-web-app-title" content="eKAT Desk">
 <meta name="theme-color" content="#9b1b22">
 <meta name="color-scheme" content="light only">
 <link rel="manifest" href="manifest.webmanifest">
@@ -19,8 +21,10 @@
   .pk > p.muted { color: rgba(255,255,255,.88); }
   .pk { max-width: 980px; margin: 0 auto; padding: 24px 16px 120px; display: flex; flex-direction: column; gap: 18px; }
   .pk-head { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
-  .pk-head img { height: 46px; width: auto; }
-  .pk-head h1 { margin: 2px 0 0; font-size: 1.5rem; }
+  .pk-head { padding: 16px 22px; }
+  .pk-title { margin: 6px 0 -8px; text-align: center; color: #fff; font-size: 1.5rem; }
+  .pk-head h1 { margin: 2px 0 0; font-size: 1.5rem; text-align: center; }
+  .pk > p.muted { text-align: center; }
   .pk h2 { margin: 0 0 4px; font-size: 1.1rem; }
   .pk .card { display: flex; flex-direction: column; gap: 12px; }
   .pk-table { width: 100%; border-collapse: collapse; }
@@ -34,8 +38,8 @@
   .drop.over { border-color: var(--brand); background: var(--brand-soft); color: var(--ink); }
   .drop strong { color: var(--ink); }
   .file-chip { display: inline-flex; gap: 8px; align-items: center; padding: 6px 10px; border-radius: 99px; background: var(--good-soft); color: var(--good); font-weight: 600; font-size: .85rem; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .pk-bar { position: fixed; left: 0; right: 0; bottom: 0; background: var(--surface); border-top: 1px solid var(--line); padding: 12px 16px calc(env(safe-area-inset-bottom, 0px) + 12px); display: flex; gap: 12px; justify-content: flex-end; align-items: center; z-index: 10; }
-  .pk-bar .muted { flex: 1; font-size: .88rem; }
+  .pk-bar { position: fixed; left: 0; right: 0; bottom: 0; background: var(--surface); border-top: 1px solid var(--line); padding: 12px 16px calc(env(safe-area-inset-bottom, 0px) + 12px); display: flex; gap: 12px; justify-content: center; align-items: center; z-index: 10; }
+  .pk-bar .muted { flex: 0 1 auto; font-size: .88rem; }
   .pk-err { color: var(--crit); font-weight: 600; }
   .pk-scroll { overflow-x: auto; }
   .pk-scroll .pk-table { min-width: 840px; }
@@ -69,9 +73,12 @@
 <body>
 <div class="pk">
   <div class="pk-head">
-    <img src="../grenzverhandlung-app-0.1_v2/assets/logo.png" alt="Vermessung ADP Rinner" width="155" height="46">
-    <div><span class="eyebrow">Im Büro, vor dem Außendienst</span><h1>Verhandlungspaket erstellen</h1></div>
+    <div class="brand-row">
+      <div class="ekat"><div class="ekat-logo"><img src="../grenzverhandlung-app-0.1_v2/assets/ekat.svg" alt="eKAT" width="326" height="112"><span class="ekat-app">Desk</span></div><div class="ekat-sub">Digitale Grenzverhandlung</div></div>
+      <img class="adp" src="../grenzverhandlung-app-0.1_v2/assets/logo.png" alt="Vermessung ADP Rinner" width="155" height="46">
+    </div>
   </div>
+  <h1 class="pk-title">Grenzverhandlungspaket erstellen</h1>
   <p class="muted" style="margin:0">Vier Felder: Protokoll, GFN, Begehungsskizze, weitere Unterlagen. Dateien hineinziehen, anklicken oder kopieren und mit Strg+V einfügen. Dann das ZIP speichern, in den Projektordner legen und am Tablet importieren. Nichts davon verlässt diesen PC.</p>
 
   <section class="card step" id="st-prot">
