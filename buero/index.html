@@ -21,7 +21,8 @@
   .pk > p.muted { color: rgba(255,255,255,.88); }
   .pk { max-width: 980px; margin: 0 auto; padding: 24px 16px 120px; display: flex; flex-direction: column; gap: 18px; }
   .pk-head { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
-  .pk-head { flex-direction: column; text-align: center; }
+  .pk-head { padding: 16px 22px; }
+  .pk-title { margin: 6px 0 -8px; text-align: center; color: #fff; font-size: 1.5rem; }
   .pk-head h1 { margin: 2px 0 0; font-size: 1.5rem; text-align: center; }
   .pk > p.muted { text-align: center; }
   .pk h2 { margin: 0 0 4px; font-size: 1.1rem; }
@@ -73,11 +74,11 @@
 <div class="pk">
   <div class="pk-head">
     <div class="brand-row">
-      <div class="ekat"><div class="ekat-logo"><img src="../grenzverhandlung-app-0.1_v2/assets/ekat.svg" alt="eKAT" width="326" height="112"><span class="ekat-app">Desk</span></div></div>
+      <div class="ekat"><div class="ekat-logo"><img src="../grenzverhandlung-app-0.1_v2/assets/ekat.svg" alt="eKAT" width="326" height="112"><span class="ekat-app">Desk</span></div><div class="ekat-sub">Digitale Grenzverhandlung</div></div>
       <img class="adp" src="../grenzverhandlung-app-0.1_v2/assets/logo.png" alt="Vermessung ADP Rinner" width="155" height="46">
     </div>
-    <h1>Grenzverhandlungspaket erstellen</h1>
   </div>
+  <h1 class="pk-title">Grenzverhandlungspaket erstellen</h1>
   <p class="muted" style="margin:0">Vier Felder: Protokoll, GFN, Begehungsskizze, weitere Unterlagen. Dateien hineinziehen, anklicken oder kopieren und mit Strg+V einfügen. Dann das ZIP speichern, in den Projektordner legen und am Tablet importieren. Nichts davon verlässt diesen PC.</p>
 
   <section class="card step" id="st-prot">
