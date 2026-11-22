@@ -47,8 +47,8 @@
   .step.done .step-n::after { content: "✓"; font-size: 1.05rem; }
   .drop.big { padding: 28px 16px; font-size: 1.05rem; }
   .drop .small { font-size: .85rem; }
-  .sk-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  @media (max-width: 640px) { .sk-row { grid-template-columns: 1fr; } }
+  .drop:hover, .drop:focus-visible { border-color: var(--brand); }
+  .drop .hint { display: block; font-size: .8rem; margin-top: 4px; }
   .pk-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
   .pk-list li { display: flex; gap: 8px; align-items: center; padding: 6px 6px 6px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); flex-wrap: wrap; }
   .pk-list li .tag { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); min-width: 70px; }
@@ -72,26 +72,29 @@
     <img src="../grenzverhandlung-app-0.1_v2/assets/logo.png" alt="Vermessung ADP Rinner" width="155" height="46">
     <div><span class="eyebrow">Im Büro, vor dem Außendienst</span><h1>Verhandlungspaket erstellen</h1></div>
   </div>
-  <p class="muted" style="margin:0">Drei Schritte: Protokoll einlesen, GFN dazulegen, Unterlagen dazulegen. Dann das ZIP speichern, in den Projektordner legen und am Tablet importieren. Nichts davon verlässt diesen PC.</p>
+  <p class="muted" style="margin:0">Vier Felder: Protokoll, GFN, Begehungsskizze, weitere Unterlagen. Dateien hineinziehen, anklicken oder kopieren und mit Strg+V einfügen. Dann das ZIP speichern, in den Projektordner legen und am Tablet importieren. Nichts davon verlässt diesen PC.</p>
 
   <section class="card step" id="st-prot">
-    <div class="step-h"><span class="step-n">1</span><div><h2>Protokoll einlesen</h2><p class="muted" style="margin:0">Das vorbereitete Protokoll (PDF aus Word, nicht gescannt). GZ, Vermessungsamt, KG, Ort und alle Eigentümer werden daraus übernommen.</p></div></div>
+    <div class="step-h"><span class="step-n">1</span><div><h2>Protokoll</h2><p class="muted" style="margin:0">Das vorbereitete Protokoll (PDF aus Word, nicht gescannt). GZ, Vermessungsamt, KG, Ort und alle Eigentümer werden daraus übernommen.</p></div></div>
     <div class="drop big" id="drop-prot"><strong>Protokoll (PDF) hierher ziehen</strong> oder klicken</div>
     <div id="prot-sum" hidden></div>
   </section>
 
   <section class="card step" id="st-gfn">
-    <div class="step-h"><span class="step-n">2</span><div><h2>GFN einlesen</h2><p class="muted" style="margin:0">Die PDFs der Grundstücksfeststellungen, mehrere auf einmal. Die Nummer kommt aus dem Dateinamen (z. B. 10828_2012_63.pdf) und kann unten korrigiert werden.</p></div></div>
+    <div class="step-h"><span class="step-n">2</span><div><h2>GFN</h2><p class="muted" style="margin:0">Die PDFs der Grundstücksfeststellungen, mehrere auf einmal. Die Nummer kommt aus dem Dateinamen (z. B. 10828_2012_63.pdf) und kann unten korrigiert werden.</p></div></div>
     <div class="drop" id="drop-beh"><strong>GFN-PDFs hierher ziehen</strong> oder klicken</div>
     <ul class="pk-list" id="beh"></ul>
   </section>
 
+  <section class="card step" id="st-sk">
+    <div class="step-h"><span class="step-n">3</span><div><h2>Begehungsskizze</h2><p class="muted" style="margin:0">Eine PDF, auf der am Tablet gezeichnet wird. Optional: ohne Skizze wird am Tablet auf einem leeren Blatt gezeichnet.</p></div></div>
+    <div class="drop" id="drop-sk"><strong>Begehungsskizze (PDF) hierher ziehen</strong> oder klicken</div>
+    <ul class="pk-list" id="sk"></ul>
+  </section>
+
   <section class="card step" id="st-unt">
-    <div class="step-h"><span class="step-n">3</span><div><h2>Unterlagen</h2><p class="muted" style="margin:0">Begehungsskizze und alles zum Nachschauen vor Ort (Angebot, Einladungen, Grundbuchsauszug …). Word-Dateien vorher als PDF speichern.</p></div></div>
-    <div class="sk-row">
-      <div class="drop" id="drop-sk"><strong>Begehungsskizze (PDF)</strong><br><span class="small">falls vorhanden, sonst am Tablet auf leerem Blatt</span></div>
-      <div class="drop" id="drop-unt"><strong>Weitere Unterlagen (PDF)</strong><br><span class="small">mehrere auf einmal möglich</span></div>
-    </div>
+    <div class="step-h"><span class="step-n">4</span><div><h2>Weitere Unterlagen</h2><p class="muted" style="margin:0">Alles zum Nachschauen vor Ort (Angebot, Einladungen, Grundbuchsauszug …), mehrere auf einmal. Word-Dateien vorher als PDF speichern.</p></div></div>
+    <div class="drop" id="drop-unt"><strong>Weitere Unterlagen (PDF) hierher ziehen</strong> oder klicken</div>
     <ul class="pk-list" id="unt"></ul>
   </section>
 </div>

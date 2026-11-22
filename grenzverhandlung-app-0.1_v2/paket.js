@@ -1,4 +1,4 @@
-/* Verhandlungspaket erstellen (Büro): Protokoll + GFN + Unterlagen → ZIP mit verhandlung.json, skizze.pdf, behelfe/, unterlagen/ */
+/* Verhandlungspaket erstellen (Büro): vier Felder Protokoll · GFN · Begehungsskizze · Weitere Unterlagen → ZIP mit verhandlung.json, skizze.pdf, behelfe/, unterlagen/ */
 'use strict';
 const $ = s => document.querySelector(s);
 const el = (tag, attrs = {}, ...kids) => { const e = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) { if (k === 'class') e.className = v; else if (k.startsWith('on')) e[k] = v; else e.setAttribute(k, v); } e.append(...kids.filter(k => k != null)); return e; };
@@ -26,7 +26,22 @@ function dropzone(box, multiple, onFiles) {
   box.ondragover = e => { e.preventDefault(); box.classList.add('over'); };
   box.ondragleave = () => box.classList.remove('over');
   box.ondrop = e => { e.preventDefault(); box.classList.remove('over'); take(e.dataTransfer.files); };
+  // Einfügen (Strg+V): in das Feld, über dem die Maus steht oder das den Fokus hat
+  box.onmouseenter = () => { pasteTarget = take; };
+  box.onfocus = () => { pasteTarget = take; };
+  box.onmouseleave = () => { if (document.activeElement !== box) pasteTarget = null; };
+  box.onblur = () => { pasteTarget = null; };
+  const hint = document.createElement('span'); hint.className = 'hint small'; hint.textContent = 'oder kopieren und mit Strg+V einfügen (Maus über dem Feld)';
+  box.append(hint);
 }
+let pasteTarget = null;
+document.addEventListener('paste', e => {
+  const fs = [...(e.clipboardData ? e.clipboardData.files : [])];
+  if (!fs.length || (e.target && e.target.matches && e.target.matches('input, textarea'))) return;
+  e.preventDefault();
+  if (!pasteTarget) { toast('Maus über das passende Feld (1–4) halten und dann Strg+V drücken.'); return; }
+  pasteTarget(fs);
+});
 const delBtn = (arr, obj, redraw) => el('button', { type: 'button', class: 'x', title: 'Entfernen', 'aria-label': 'Entfernen', onclick: () => { arr.splice(arr.indexOf(obj), 1); redraw(); check(); } }, '✕');
 const field = (obj, key, ph, cls) => { const i = el('input', { placeholder: ph || '' }); if (cls) i.className = cls; i.value = obj[key] || ''; i.oninput = () => { obj[key] = i.value; check(); }; return i; };
 
@@ -57,17 +72,19 @@ dropzone($('#drop-beh'), true, fs => {
   drawBeh(); check();
 });
 
-/* 3 · Unterlagen und Skizze */
-function drawUnt() {
-  const items = [];
-  if (state.skizze) items.push(el('li', {}, el('span', { class: 'tag' }, 'Skizze'), el('span', { style: 'flex:1;font-weight:600' }, state.skizze.name),
-    el('button', { type: 'button', class: 'x', title: 'Entfernen', 'aria-label': 'Entfernen', onclick: () => { state.skizze = null; drawUnt(); check(); } }, '✕')));
-  for (const u of state.unt) items.push(el('li', {}, el('span', { class: 'tag' }, 'Unterlage'), field(u, 'titel', 'Titel in der App'),
-    el('span', { class: 'fn', title: u.file.name }, u.file.name), delBtn(state.unt, u, drawUnt)));
-  $('#unt').replaceChildren(...items);
-  $('#drop-sk').querySelector('strong').textContent = state.skizze ? 'Begehungsskizze ersetzen' : 'Begehungsskizze (PDF)';
+/* 3 · Begehungsskizze */
+function drawSk() {
+  $('#sk').replaceChildren(...(state.skizze ? [el('li', {}, el('span', { class: 'tag' }, 'Skizze'), el('span', { style: 'flex:1;font-weight:600' }, state.skizze.name),
+    el('button', { type: 'button', class: 'x', title: 'Entfernen', 'aria-label': 'Entfernen', onclick: () => { state.skizze = null; drawSk(); check(); } }, '✕'))] : []));
+  $('#drop-sk').querySelector('strong').textContent = state.skizze ? 'Begehungsskizze ersetzen' : 'Begehungsskizze (PDF) hierher ziehen';
 }
-dropzone($('#drop-sk'), false, fs => { state.skizze = fs[0]; drawUnt(); check(); });
+dropzone($('#drop-sk'), false, fs => { if (fs.length > 1) toast('Nur eine Begehungsskizze möglich, die erste Datei wurde genommen.'); state.skizze = fs[0]; drawSk(); check(); });
+
+/* 4 · Weitere Unterlagen */
+function drawUnt() {
+  $('#unt').replaceChildren(...state.unt.map(u => el('li', {}, el('span', { class: 'tag' }, 'Unterlage'), field(u, 'titel', 'Titel in der App'),
+    el('span', { class: 'fn', title: u.file.name }, u.file.name), delBtn(state.unt, u, drawUnt))));
+}
 dropzone($('#drop-unt'), true, fs => {
   for (const f of fs) if (!state.unt.some(u => u.file.name === f.name && u.file.size === f.size)) state.unt.push({ titel: titleOf(f.name), file: f });
   drawUnt(); check();
@@ -154,14 +171,12 @@ dropzone($('#drop-prot'), false, async fs => {
       box.querySelector('strong').textContent = state.prot ? 'Anderes Protokoll einlesen' : 'Protokoll (PDF) hierher ziehen';
       return;
     }
-    if (state.prot) state.unt = state.unt.filter(u => u.file !== state.prot);
     state.prot = f;
     state.kopf = { verhandlungsleiter: state.kopf.verhandlungsleiter, kanzlei: state.kopf.kanzlei, ...Object.fromEntries(Object.entries(r.kopf).filter(([, v]) => v)) };
     state.bet = r.people;
-    state.unt.unshift({ titel: 'Vorbereitetes Protokoll (Papier)', file: f });
     box.classList.remove('big');
-    box.replaceChildren(el('span', { class: 'file-chip' }, '✓ ' + f.name), el('span', {}, '  · '), el('strong', {}, 'Anderes Protokoll einlesen'));
-    drawProt(); drawUnt(); check();
+    box.replaceChildren(el('span', { class: 'file-chip' }, '✓ ' + f.name), el('span', {}, '  · '), el('strong', {}, 'Anderes Protokoll einlesen'), box.querySelector('.hint'));
+    drawProt(); check();
     toast(`GZ ${r.kopf.gz}: ${r.people.length} Eigentümer übernommen. Bitte kurz prüfen.`);
   } catch (e) { toast('Protokoll konnte nicht gelesen werden: ' + e.message); box.querySelector('strong').textContent = 'Protokoll (PDF) hierher ziehen'; }
 });
@@ -178,8 +193,9 @@ function check() {
   const p = problems(), st = $('#status');
   $('#st-prot').classList.toggle('done', !!state.prot);
   $('#st-gfn').classList.toggle('done', state.beh.length > 0);
-  $('#st-unt').classList.toggle('done', !!state.skizze || state.unt.length > 1);
-  const parts = [state.prot ? `GZ ${state.kopf.gz} · ${state.bet.length} Eigentümer` : '', `${state.beh.length} GFN`, state.skizze ? 'Skizze' : 'ohne Skizze (am Tablet leeres Blatt)', `${state.unt.length} Unterlagen`].filter(Boolean);
+  $('#st-sk').classList.toggle('done', !!state.skizze);
+  $('#st-unt').classList.toggle('done', state.unt.length > 0);
+  const parts = [state.prot ? `GZ ${state.kopf.gz} · ${state.bet.length} Eigentümer` : '', `${state.beh.length} GFN`, state.skizze ? 'Skizze' : 'ohne Skizze (am Tablet leeres Blatt)', `${state.unt.length} weitere Unterlagen`].filter(Boolean);
   st.className = p.length ? 'pk-err' : 'muted';
   st.textContent = p.length ? 'Noch offen: ' + p.join(' · ') : parts.join(' · ');
   $('#save').disabled = !state.prot;
@@ -202,7 +218,8 @@ $('#save').onclick = async () => {
       o.datei = uniq('behelfe/', o.geschaeftszahl, used); zip.file(o.datei, b.file);
       return o;
     });
-    json.unterlagen = state.unt.map(u => {
+    // Protokoll steht wie bisher als erste Unterlage im Paket (gleiches Format für die App)
+    json.unterlagen = [{ titel: 'Vorbereitetes Protokoll (Papier)', file: state.prot }, ...state.unt].map(u => {
       const datei = uniq('unterlagen/', u.file.name, used); zip.file(datei, u.file);
       return { titel: u.titel.trim() || titleOf(u.file.name), datei };
     });
