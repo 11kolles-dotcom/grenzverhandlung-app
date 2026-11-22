@@ -1,14 +1,14 @@
 {
   "id": "/grenzverhandlung-app/buero/",
-  "name": "eKAT Desk – Verhandlungspaket erstellen",
+  "name": "eKAT Desk – Grenzverhandlungspaket erstellen",
   "short_name": "eKAT Desk",
-  "description": "Verhandlungspakete im Büro erstellen, by ADP Rinner",
+  "description": "Grenzverhandlungspakete im Büro erstellen",
   "lang": "de-AT",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "background_color": "#f3f2ef",
-  "theme_color": "#c8dbe8",
+  "theme_color": "#9b1b22",
   "icons": [
     {
       "src": "icon-192.png",

@@ -1,11 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="96" fill="#c8dbe8"/>
-  <path transform="translate(16 16)" fill="#1d1a19" d="M128 76 H316 L392 152 V436 H128 Z"/>
-  <g stroke="#1d1a19" stroke-width="16" stroke-linejoin="round">
-    <path d="M128 76 H316 L392 152 V436 H128 Z" fill="#fffcf3"/>
-    <path d="M316 76 V152 H392" fill="#f4e3a6"/>
-  </g>
-  <path d="M178 136 H250 M214 104 V168" stroke="#9b1b22" stroke-width="14" stroke-linecap="round"/>
-  <path d="M184 380 L212 234 L330 220 L348 360 Z" fill="none" stroke="#1d1a19" stroke-width="10" stroke-linejoin="round" stroke-dasharray="24 14"/>
-  <g fill="#f2c9c4" stroke="#1d1a19" stroke-width="9"><circle cx="184" cy="380" r="18"/><circle cx="212" cy="234" r="18"/><circle cx="330" cy="220" r="18"/><circle cx="348" cy="360" r="18"/></g>
+<clipPath id="r"><rect width="512" height="512" rx="96"/></clipPath>
+<g clip-path="url(#r)">
+<rect width="512" height="512" fill="#fffcf3"/>
+<rect width="512" height="104" fill="#9b1b22"/>
+<path d="M0 104 H512" stroke="#1d1a19" stroke-width="10"/>
+<g fill="#fffcf3" stroke="#1d1a19" stroke-width="7"><circle cx="330" cy="54" r="17"/><circle cx="380" cy="54" r="17"/><circle cx="430" cy="54" r="17"/></g>
+</g>
+<g transform="translate(78 170) scale(1.1)"><defs><clipPath id="c"><rect x="-10" y="0" width="360" height="112"/></clipPath></defs><g fill="none" stroke-width="17" stroke-linejoin="miter" stroke-miterlimit="10" clip-path="url(#c)">
+<path d="M8 66 H70 A31 31 0 1 0 62 88" stroke="#9b1b22"/>
+<path d="M98 0 V100 M148 0 L98 58 M119 34 L152 100" stroke="#1d1a19"/>
+<path d="M164 100 L200 0 L236 100 M176 70 H224" stroke="#1d1a19"/>
+<path d="M246 8.5 H320 M283 8.5 V100" stroke="#1d1a19"/>
+</g></g>
+<path d="M78 322 H434" stroke="#9b1b22" stroke-width="8" stroke-dasharray="22 12"/>
+<text x="256" y="408" text-anchor="middle" font-family="Inter, 'Helvetica Neue', Arial, sans-serif" font-size="64" font-weight="400" letter-spacing="12" fill="#1d1a19">DESK</text>
 </svg>

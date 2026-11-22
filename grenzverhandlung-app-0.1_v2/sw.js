@@ -2,7 +2,7 @@
 const CACHE = 'gv-0.9.17';
 const FILES = ['./', 'index.html', 'styles.css', 'retro.css', 'app.js', 'paket.js', 'manifest.webmanifest', 'icon.svg', 'icon-192.png', 'icon-512.png',
   'libs/pdf.min.js', 'libs/pdf.worker.min.js', 'libs/pdf-lib.min.js', 'libs/jszip.min.js', 'libs/qrcode.js',
-  'assets/logo.png', 'assets/hintergrund.jpg',
+  'assets/logo.png', 'assets/hintergrund.jpg', 'assets/ekat.svg',
   'fonts/inter-latin-400-normal.woff2', 'fonts/inter-latin-600-normal.woff2', 'fonts/inter-latin-700-normal.woff2'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES.map(f => new Request(f, { cache: 'reload' })))).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE && !k.startsWith('gv-buero-')).map(k => caches.delete(k)))).then(() => self.clients.claim())); });

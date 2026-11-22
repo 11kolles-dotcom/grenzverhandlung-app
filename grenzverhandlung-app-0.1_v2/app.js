@@ -1,4 +1,4 @@
-/* eKAT Field by ADP Rinner – Digitale Grenzverhandlung (Prototyp zur Masterarbeit, Kapitel 6.5)
+/* eKAT Field – ADP Rinner – Digitale Grenzverhandlung (Prototyp zur Masterarbeit, Kapitel 6.5)
  * Offline-Web-App: GZ-Auswahl, Übersicht, Behelfe, Begehungsskizze mit Stift und Grenzzeichen,
  * Protokoll nach § 43 Abs. 6 VermG (Vorlage der Kanzlei), Sperre mit Prüfsumme,
  * Zustimmung per ID Austria (QES über externen Signaturdienst), Papier oder Stift (nur Information), Export.
@@ -575,9 +575,8 @@ VIEWS.start = async page => {
     h('div', { class: 'start-card' },
       h('div', { class: 'head' },
         h('div', { class: 'brand-row' },
-          h('div', { class: 'ekat' }, h('img', { src: 'icon.svg', alt: '', width: 56, height: 56 }),
-            h('div', {}, h('div', { class: 'ekat-name' }, h('span', { class: 'ekat-e' }, 'e'), 'KAT ', h('span', { class: 'ekat-app' }, 'Field')),
-              h('div', { class: 'ekat-by' }, 'Digitale Grenzverhandlung · by ADP Rinner'))),
+          h('div', { class: 'ekat' }, h('div', { class: 'ekat-logo' }, h('img', { src: 'assets/ekat.svg', alt: 'eKAT', width: 326, height: 112 }), h('span', { class: 'ekat-app' }, 'Field')),
+            h('div', { class: 'ekat-sub' }, 'Digitale Grenzverhandlung')),
           h('img', { class: 'adp', src: 'assets/logo.png', alt: 'Vermessung ADP Rinner', width: 309, height: 92 })),
         h('div', {},
           h('h1', {}, 'Wähle ein Projekt'),
@@ -1697,7 +1696,7 @@ async function buildProtocol(v, opts = {}) {
   doc.setTitle(`Protokoll Grenzverhandlung ${v.gz}`);
   doc.setSubject('Protokoll über die Festlegung des Grenzverlaufs gemäß § 43 Abs. 6 VermG und § 52 Z 5 VermG');
   doc.setProducer(`eKAT Field ${APP_VERSION} (Prototyp)`);
-  doc.setCreator('eKAT Field by ADP Rinner');
+  doc.setCreator('eKAT Field · ADP Rinner');
   const F = await doc.embedFont(StandardFonts.Helvetica);
   const FB = await doc.embedFont(StandardFonts.HelveticaBold);
   const lb = await getLogoBytes();
