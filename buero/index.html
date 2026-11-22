@@ -3,7 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Paket erstellen</title>
+<title>eKAT Desk</title>
+<meta name="application-name" content="eKAT Desk">
+<meta name="apple-mobile-web-app-title" content="eKAT Desk">
 <meta name="theme-color" content="#9b1b22">
 <meta name="color-scheme" content="light only">
 <link rel="manifest" href="manifest.webmanifest">
@@ -19,7 +21,7 @@
   .pk > p.muted { color: rgba(255,255,255,.88); }
   .pk { max-width: 980px; margin: 0 auto; padding: 24px 16px 120px; display: flex; flex-direction: column; gap: 18px; }
   .pk-head { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
-  .pk-head img { height: 46px; width: auto; }
+  .pk-head .brand-row { flex: 1 1 auto; }
   .pk-head h1 { margin: 2px 0 0; font-size: 1.5rem; }
   .pk h2 { margin: 0 0 4px; font-size: 1.1rem; }
   .pk .card { display: flex; flex-direction: column; gap: 12px; }
@@ -69,8 +71,10 @@
 <body>
 <div class="pk">
   <div class="pk-head">
-    <img src="../grenzverhandlung-app-0.1_v2/assets/logo.png" alt="Vermessung ADP Rinner" width="155" height="46">
-    <div><span class="eyebrow">Im Büro, vor dem Außendienst</span><h1>Verhandlungspaket erstellen</h1></div>
+    <div class="brand-row">
+      <div class="ekat"><img src="icon.svg" alt="" width="56" height="56"><div><div class="ekat-name"><span class="ekat-e">e</span>KAT <span class="ekat-app">Desk</span></div><div class="ekat-by">Paket erstellen · by ADP Rinner</div></div></div>
+      <img class="adp" src="../grenzverhandlung-app-0.1_v2/assets/logo.png" alt="Vermessung ADP Rinner" width="155" height="46">
+    </div>
   </div>
   <p class="muted" style="margin:0">Vier Felder: Protokoll, GFN, Begehungsskizze, weitere Unterlagen. Dateien hineinziehen, anklicken oder kopieren und mit Strg+V einfügen. Dann das ZIP speichern, in den Projektordner legen und am Tablet importieren. Nichts davon verlässt diesen PC.</p>
 

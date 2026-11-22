@@ -1,11 +1,11 @@
-/* ADP Rinner – Digitale Grenzverhandlung (Prototyp zur Masterarbeit, Kapitel 6.5)
+/* eKAT Field by ADP Rinner – Digitale Grenzverhandlung (Prototyp zur Masterarbeit, Kapitel 6.5)
  * Offline-Web-App: GZ-Auswahl, Übersicht, Behelfe, Begehungsskizze mit Stift und Grenzzeichen,
  * Protokoll nach § 43 Abs. 6 VermG (Vorlage der Kanzlei), Sperre mit Prüfsumme,
  * Zustimmung per ID Austria (QES über externen Signaturdienst), Papier oder Stift (nur Information), Export.
  */
 'use strict';
 
-const APP_VERSION = '0.9.16';
+const APP_VERSION = '0.9.17';
 const EGIZ_URL = 'https://pdf.egiz.gv.at/';
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'libs/pdf.worker.min.js';
 
@@ -574,8 +574,12 @@ VIEWS.start = async page => {
   main.append(h('div', { class: 'start' }, h('div', { class: 'start-inner' },
     h('div', { class: 'start-card' },
       h('div', { class: 'head' },
-        h('img', { src: 'assets/logo.png', alt: 'Vermessung ADP Rinner', width: 309, height: 92 }),
-        h('div', {}, h('span', { class: 'eyebrow' }, 'Digitale Grenzverhandlung'),
+        h('div', { class: 'brand-row' },
+          h('div', { class: 'ekat' }, h('img', { src: 'icon.svg', alt: '', width: 56, height: 56 }),
+            h('div', {}, h('div', { class: 'ekat-name' }, h('span', { class: 'ekat-e' }, 'e'), 'KAT ', h('span', { class: 'ekat-app' }, 'Field')),
+              h('div', { class: 'ekat-by' }, 'Digitale Grenzverhandlung · by ADP Rinner'))),
+          h('img', { class: 'adp', src: 'assets/logo.png', alt: 'Vermessung ADP Rinner', width: 309, height: 92 })),
+        h('div', {},
           h('h1', {}, 'Wähle ein Projekt'),
           h('p', { class: 'muted' }, 'Projekt nach Geschäftszahl antippen. Alle Unterlagen liegen am Gerät, die Verhandlung läuft auch ohne Netz.'))),
       list,
@@ -585,9 +589,9 @@ VIEWS.start = async page => {
     h('details', {},
       h('summary', {}, 'Wie kommt eine Verhandlung aufs Gerät?'),
       h('div', { class: 'card stack' },
-        h('p', {}, 'Die Kanzlei stellt je Geschäftszahl ein ZIP-Paket zusammen: Kopfdaten, Beteiligte, GFN, Begehungsskizze und Unterlagen wie Angebot und Ladung. Das geht im Büro am PC mit der Seite „Paket erstellen“. Telefonnummern und E-Mail-Adressen gehören nicht hinein.'),
-        h('div', { class: 'row' }, h('a', { class: 'btn', href: '../buero/' }, icon('folder'), 'Paket erstellen (Büro)'), h('button', { class: 'btn', type: 'button', onclick: e => busy(e.currentTarget, async () => download(await demoZipBlob(), 'Beispielpaket_19389.zip')) }, 'Beispielpaket herunterladen')))),
-    h('p', { class: 'start-note' }, `Prototyp ${APP_VERSION} zur Masterarbeit „E-Geo-Government in der österreichischen Katastervermessung“, TU Graz. Daten bleiben ausschließlich auf diesem Gerät.`))));
+        h('p', {}, 'Die Kanzlei stellt je Geschäftszahl ein ZIP-Paket zusammen: Kopfdaten, Beteiligte, GFN, Begehungsskizze und Unterlagen wie Angebot und Ladung. Das geht im Büro am PC mit eKAT Desk. Telefonnummern und E-Mail-Adressen gehören nicht hinein.'),
+        h('div', { class: 'row' }, h('a', { class: 'btn', href: '../buero/' }, icon('folder'), 'eKAT Desk öffnen (Büro)'), h('button', { class: 'btn', type: 'button', onclick: e => busy(e.currentTarget, async () => download(await demoZipBlob(), 'Beispielpaket_19389.zip')) }, 'Beispielpaket herunterladen')))),
+    h('p', { class: 'start-note' }, `eKAT Field ${APP_VERSION} · Prototyp zur Masterarbeit „E-Geo-Government in der österreichischen Katastervermessung“, TU Graz. Daten bleiben ausschließlich auf diesem Gerät.`))));
   app.list = (await DB.all()).map(migrate);
   // anstehende Verhandlungen zuerst (nach Datum), erledigte ans Ende
   const fertig = v => v.status === 'unterfertigt' || v.status === 'abgeschlossen';
@@ -1487,7 +1491,7 @@ function leiterCard() {
 /* ---------- 7 Export ---------- */
 function exportJson(v) {
   return {
-    app: 'Digitale Grenzverhandlung', version: APP_VERSION, gz: v.gz, meta: v.meta, protokollVersion: v.version,
+    app: 'eKAT Field', version: APP_VERSION, gz: v.gz, meta: v.meta, protokollVersion: v.version,
     gesperrt: v.locked ? { zeit: new Date(v.locked.zeit).toISOString(), sha256: v.locked.hash } : null,
     verhandlungsleiter: v.leiterSig ? { name: v.meta.leiter, art: v.leiterSig.art, zeit: new Date(v.leiterSig.zeit).toISOString() } : null,
     signaturen: v.signed && v.signed.pruefung ? v.signed.pruefung.map(x => ({ ...x, zeit: x.zeit ? new Date(x.zeit).toISOString() : null })) : [],
@@ -1580,7 +1584,7 @@ async function getLogoBytes() {
 async function leeresBlatt(v, seiten = 1) {
   const { PDFDocument, StandardFonts, rgb } = PDFLib;
   const doc = await PDFDocument.create(), F = await doc.embedFont(StandardFonts.Helvetica);
-  doc.setTitle(`Handskizze ${v.gz}`); doc.setProducer(`Digitale Grenzverhandlung ${APP_VERSION} (Prototyp)`);
+  doc.setTitle(`Handskizze ${v.gz}`); doc.setProducer(`eKAT Field ${APP_VERSION} (Prototyp)`);
   const W = 841.89, H = 595.28, mm = 72 / 25.4, rand = 10 * mm, dot = rgb(0.78, 0.78, 0.78);
   for (let n = 1; n <= seiten; n++) {
     const p = doc.addPage([W, H]);
@@ -1623,7 +1627,7 @@ function drawSketchInk(p, v, idx, FB) {
 async function buildFotoplan(v) {
   const { PDFDocument, StandardFonts, rgb } = PDFLib;
   const doc = await PDFDocument.create();
-  doc.setTitle(`Fotoplan ${v.gz}`); doc.setProducer(`Digitale Grenzverhandlung ${APP_VERSION} (Prototyp)`);
+  doc.setTitle(`Fotoplan ${v.gz}`); doc.setProducer(`eKAT Field ${APP_VERSION} (Prototyp)`);
   const F = await doc.embedFont(StandardFonts.Helvetica), FB = await doc.embedFont(StandardFonts.HelveticaBold);
   const orange = hexRgb(FOTO_FARBE), white = rgb(1, 1, 1);
   const placed = v.fotos.map((f, i) => ({ f, nr: i + 1 })).filter(x => x.f.pos);
@@ -1692,8 +1696,8 @@ async function buildProtocol(v, opts = {}) {
   const doc = await PDFDocument.create();
   doc.setTitle(`Protokoll Grenzverhandlung ${v.gz}`);
   doc.setSubject('Protokoll über die Festlegung des Grenzverlaufs gemäß § 43 Abs. 6 VermG und § 52 Z 5 VermG');
-  doc.setProducer(`Digitale Grenzverhandlung ${APP_VERSION} (Prototyp)`);
-  doc.setCreator('ADP Rinner – Digitale Grenzverhandlung');
+  doc.setProducer(`eKAT Field ${APP_VERSION} (Prototyp)`);
+  doc.setCreator('eKAT Field by ADP Rinner');
   const F = await doc.embedFont(StandardFonts.Helvetica);
   const FB = await doc.embedFont(StandardFonts.HelveticaBold);
   const lb = await getLogoBytes();
@@ -1907,7 +1911,7 @@ async function buildProtocol(v, opts = {}) {
     const cell = (t, col, row) => p.drawText(ansi(t), { x: xs[col] + 3, y: top - row * rh - 13, size: 10, font: F, color: black });
     cell('Vermessungsamt:', 0, 0); cell(v.meta.vermessungsamt, 1, 0); cell('Seite:', 2, 0); cell(`${i + 1}  von ${protoPages}`, 3, 0);
     cell('Katastralgemeinde:', 0, 1); cell(v.meta.kg, 1, 1); cell('Projekt:', 2, 1); cell(v.gz, 3, 1);
-    p.drawText(ansi(`Protokoll Version ${v.version} · Digitale Grenzverhandlung ${APP_VERSION}${opts.unterschriften ? ' · Ausfertigung mit Stift-Unterschriften (Information)' : ''}`), { x: M, y: 26, size: 6.5, font: F, color: grey });
+    p.drawText(ansi(`Protokoll Version ${v.version} · eKAT Field ${APP_VERSION}${opts.unterschriften ? ' · Ausfertigung mit Stift-Unterschriften (Information)' : ''}`), { x: M, y: 26, size: 6.5, font: F, color: grey });
   });
   return doc.save();
 }

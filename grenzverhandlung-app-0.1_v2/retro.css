@@ -360,3 +360,20 @@ summary { padding: 8px 0; }
 
 /* 0.9.11: Hintergrundbild am Startbildschirm ganz leicht weichzeichnen */
 .start::before { -webkit-backdrop-filter: blur(2.5px); backdrop-filter: blur(2.5px); }
+
+/* ---------- eKAT-Marke (eKAT Field / eKAT Desk, by ADP Rinner) ---------- */
+.brand-row { display: flex; align-items: center; justify-content: space-between; gap: 14px 24px; flex-wrap: wrap; }
+.ekat { display: flex; align-items: center; gap: 12px; }
+.ekat > img { width: 56px; height: 56px; flex: none; border-radius: 13px; box-shadow: var(--hard-s); }
+.ekat-name { font-size: 1.75rem; font-weight: 700; letter-spacing: -.01em; line-height: 1.05; color: var(--ink); }
+.ekat-e { color: var(--brand); }
+.ekat-app { font-weight: 400; }
+.ekat-by { margin-top: 3px; font-size: .78rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.brand-row img.adp { height: 44px; width: auto; max-width: none; }
+.start-card .head .ekat > img { width: 56px; height: 56px; max-width: none; }
+.start-card .head .brand-row img.adp { width: auto; height: 46px; max-width: 45%; }
+@media (max-width: 560px) {
+  .brand-row img.adp { height: 34px !important; }
+  .ekat-name { font-size: 1.5rem; }
+  .ekat > img, .start-card .head .ekat > img { width: 48px; height: 48px; }
+}
