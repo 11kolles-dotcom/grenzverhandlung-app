@@ -1,17 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
 <clipPath id="r"><rect width="512" height="512" rx="96"/></clipPath>
 <g clip-path="url(#r)">
-<rect width="512" height="512" fill="#fffcf3"/>
+<rect width="512" height="512" fill="#2b2725"/>
 <rect width="512" height="104" fill="#9b1b22"/>
 <path d="M0 104 H512" stroke="#1d1a19" stroke-width="10"/>
 <g fill="#fffcf3" stroke="#1d1a19" stroke-width="7"><circle cx="330" cy="54" r="17"/><circle cx="380" cy="54" r="17"/><circle cx="430" cy="54" r="17"/></g>
 </g>
-<g transform="translate(78 170) scale(1.1)"><defs><clipPath id="c"><rect x="-10" y="0" width="360" height="112"/></clipPath></defs><g fill="none" stroke-width="17" stroke-linejoin="miter" stroke-miterlimit="10" clip-path="url(#c)">
-<path d="M8 66 H70 A31 31 0 1 0 62 88" stroke="#9b1b22"/>
-<path d="M98 0 V100 M148 0 L98 58 M119 34 L152 100" stroke="#1d1a19"/>
-<path d="M164 100 L200 0 L236 100 M176 70 H224" stroke="#1d1a19"/>
-<path d="M246 8.5 H320 M283 8.5 V100" stroke="#1d1a19"/>
+<g transform="translate(80 170) scale(1.1)"><defs><clipPath id="c"><rect x="-10" y="0" width="360" height="112"/></clipPath></defs><g fill="none" stroke-width="17" stroke-linejoin="miter" stroke-miterlimit="10" clip-path="url(#c)">
+<path d="M8 66 H70 A31 31 0 1 0 62 88" stroke="#f08a8f"/>
+<path d="M98 0 V100 M148 0 L98 58 M119 34 L152 100" stroke="#fffcf3"/>
+<path d="M164 100 L200 0 L236 100 M176 70 H224" stroke="#fffcf3"/>
+<path d="M246 8.5 H320 M283 8.5 V100" stroke="#fffcf3"/>
 </g></g>
-<path d="M78 322 H434" stroke="#9b1b22" stroke-width="8" stroke-dasharray="22 12"/>
-<text x="256" y="408" text-anchor="middle" font-family="Inter, 'Helvetica Neue', Arial, sans-serif" font-size="64" font-weight="400" letter-spacing="12" fill="#1d1a19">DESK</text>
+<path d="M80 322 H432" stroke="#f08a8f" stroke-width="8" stroke-dasharray="22 12"/>
+<text x="262" y="408" text-anchor="middle" font-family="Inter, 'Helvetica Neue', Arial, sans-serif" font-size="64" font-weight="400" letter-spacing="12" fill="#fffcf3">DESK</text>
 </svg>

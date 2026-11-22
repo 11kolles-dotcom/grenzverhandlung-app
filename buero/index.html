@@ -21,8 +21,9 @@
   .pk > p.muted { color: rgba(255,255,255,.88); }
   .pk { max-width: 980px; margin: 0 auto; padding: 24px 16px 120px; display: flex; flex-direction: column; gap: 18px; }
   .pk-head { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
-  .pk-head .brand-row { flex: 1 1 auto; }
-  .pk-head h1 { margin: 2px 0 0; font-size: 1.5rem; }
+  .pk-head { flex-direction: column; text-align: center; }
+  .pk-head h1 { margin: 2px 0 0; font-size: 1.5rem; text-align: center; }
+  .pk > p.muted { text-align: center; }
   .pk h2 { margin: 0 0 4px; font-size: 1.1rem; }
   .pk .card { display: flex; flex-direction: column; gap: 12px; }
   .pk-table { width: 100%; border-collapse: collapse; }
@@ -36,8 +37,8 @@
   .drop.over { border-color: var(--brand); background: var(--brand-soft); color: var(--ink); }
   .drop strong { color: var(--ink); }
   .file-chip { display: inline-flex; gap: 8px; align-items: center; padding: 6px 10px; border-radius: 99px; background: var(--good-soft); color: var(--good); font-weight: 600; font-size: .85rem; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .pk-bar { position: fixed; left: 0; right: 0; bottom: 0; background: var(--surface); border-top: 1px solid var(--line); padding: 12px 16px calc(env(safe-area-inset-bottom, 0px) + 12px); display: flex; gap: 12px; justify-content: flex-end; align-items: center; z-index: 10; }
-  .pk-bar .muted { flex: 1; font-size: .88rem; }
+  .pk-bar { position: fixed; left: 0; right: 0; bottom: 0; background: var(--surface); border-top: 1px solid var(--line); padding: 12px 16px calc(env(safe-area-inset-bottom, 0px) + 12px); display: flex; gap: 12px; justify-content: center; align-items: center; z-index: 10; }
+  .pk-bar .muted { flex: 0 1 auto; font-size: .88rem; }
   .pk-err { color: var(--crit); font-weight: 600; }
   .pk-scroll { overflow-x: auto; }
   .pk-scroll .pk-table { min-width: 840px; }

@@ -361,16 +361,21 @@ summary { padding: 8px 0; }
 /* 0.9.11: Hintergrundbild am Startbildschirm ganz leicht weichzeichnen */
 .start::before { -webkit-backdrop-filter: blur(2.5px); backdrop-filter: blur(2.5px); }
 
-/* ---------- eKAT-Marke (Wortmarke gleich für eKAT Field und eKAT Desk) ---------- */
-.brand-row { display: flex; align-items: center; justify-content: space-between; gap: 14px 24px; flex-wrap: wrap; width: 100%; }
-.ekat { display: flex; flex-direction: column; gap: 6px; }
-.ekat-logo { display: flex; align-items: flex-end; gap: 12px; }
-.ekat-logo img, .start-card .head .ekat-logo img { height: 44px; width: auto; max-width: none; display: block; }
-.ekat-app { font-size: 1.9rem; font-weight: 400; letter-spacing: .02em; color: var(--ink); line-height: .8; padding-bottom: 1px; }
+/* ---------- eKAT-Marke (Wortmarke gleich für eKAT Field und eKAT Desk), Kopf zentriert ---------- */
+.brand-row { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%; text-align: center; }
+.ekat { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.ekat-logo { display: flex; align-items: flex-end; justify-content: center; gap: 12px; }
+.ekat-logo img, .start-card .head .ekat-logo img { height: 46px; width: auto; max-width: none; display: block; }
+.ekat-app { font-size: 2rem; font-weight: 400; letter-spacing: .02em; color: var(--ink); line-height: .8; padding-bottom: 1px; }
 .ekat-sub { font-size: .78rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
-.brand-row img.adp, .start-card .head .brand-row img.adp { height: 46px; width: auto; max-width: 45%; }
+.brand-row img.adp, .start-card .head .brand-row img.adp { height: 38px; width: auto; max-width: 70%; }
+.start-card .head { align-items: center; text-align: center; }
+.start-card .head h1 { margin-top: 4px; }
+.start-card .foot { justify-content: center; }
+.start-card .empty { text-align: center; }
 @media (max-width: 560px) {
-  .ekat-logo img, .start-card .head .ekat-logo img { height: 36px; }
-  .ekat-app { font-size: 1.55rem; }
-  .brand-row img.adp, .start-card .head .brand-row img.adp { height: 34px; }
+  .ekat-logo img, .start-card .head .ekat-logo img { height: 38px; }
+  .ekat-app { font-size: 1.65rem; }
+  .brand-row img.adp, .start-card .head .brand-row img.adp { height: 32px; }
+  .start-card .foot .btn { flex: 1 1 100%; justify-content: center; }
 }
