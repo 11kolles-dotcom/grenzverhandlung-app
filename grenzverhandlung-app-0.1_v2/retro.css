@@ -384,3 +384,10 @@ summary { padding: 8px 0; }
   .brand-row img.adp, .start-card .head .brand-row img.adp { height: 28px; }
   .start-card .foot .btn { flex: 1 1 100%; justify-content: center; }
 }
+
+/* 0.9.18: eigener Schritt Behelfe */
+.behelfe-card .opener-text p { margin: 0 0 8px; }
+.behelfe-sel { font-weight: 700; font-size: 1.02rem; }
+.gfn-list li { padding: 8px 6px; border-radius: 8px; }
+.gfn-list li.on { background: var(--good-soft, #e3efe3); }
+.gfn-list .check input { width: 22px; height: 22px; }

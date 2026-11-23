@@ -5,7 +5,7 @@
  */
 'use strict';
 
-const APP_VERSION = '0.9.17';
+const APP_VERSION = '0.9.18';
 const EGIZ_URL = 'https://pdf.egiz.gv.at/';
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'libs/pdf.worker.min.js';
 
@@ -148,7 +148,8 @@ const VOLLMACHT = [['V.i.A.', 'im Akt', 'Vollmacht im Akt'], ['V.p.P.', 'Post', 
 const SYMBOLE = { GS: 'Grenzstein', MM: 'Marke Metall', MK: 'Marke Kunststoff', ER: 'Rohr (Eisen)', NG: 'Vermessungsnagel', HN: 'Hiltinagel', ME: 'Mauerecke', HE: 'Hausecke', ZS: 'Zaunsäule' };
 
 const STEPS = [
-  { k: 'eroeffnung', t: 'Eröffnung', s: 'Anwesende und GFN' },
+  { k: 'eroeffnung', t: 'Eröffnung', s: 'Anwesende Personen' },
+  { k: 'behelfe', t: 'Behelfe', s: 'GFN vorhalten' },
   { k: 'skizze', t: 'Skizze', s: 'Freihand zeichnen' },
   { k: 'beschreibung', t: 'Grenzverlauf', s: 'Beschreibung' },
   { k: 'abschluss', t: 'Abschluss', s: 'Prüfen und sperren' },
@@ -225,7 +226,7 @@ const app = { list: [], cur: null, view: 'start', editing: null, pending: null }
 const isLocked = () => !!(app.cur && app.cur.locked);
 /* Skizze, Grenzverlauf, Abschluss und Zustimmung erst nach der Eröffnung; Anwesenheit schon vorher */
 const isOpened = (v = app.cur) => !!(v && (v.meta.eroeffnung || v.locked));
-const GATED = ['skizze', 'beschreibung', 'abschluss', 'zustimmung'];
+const GATED = ['behelfe', 'skizze', 'beschreibung', 'abschluss', 'zustimmung'];
 const owners = v => v.beteiligte.filter(b => b.rolle === 'Eigentümer');
 
 let saveTimer;
@@ -492,7 +493,8 @@ function field(label, value, oninput, { type = 'text', disabled = false, id, pla
 function stepDone(k, v = app.cur) {
   if (!v) return false;
   switch (k) {
-    case 'eroeffnung': return !!v.meta.eroeffnung && v.beteiligte.some(present) && v.behelfe.some(b => b.vorgehalten);
+    case 'eroeffnung': return !!v.meta.eroeffnung && v.beteiligte.some(present);
+    case 'behelfe': return v.behelfe.some(b => b.vorgehalten);
     case 'skizze': return inkCount(v.skizze) > 0;
     case 'beschreibung': return !!v.beschreibung.gesehen && !!(v.beschreibung.text || '').trim();
     case 'abschluss': return !!v.locked;
@@ -502,7 +504,7 @@ function stepDone(k, v = app.cur) {
   }
 }
 function progress(v) {
-  const ks = ['eroeffnung', 'skizze', 'beschreibung', 'abschluss', 'zustimmung'];
+  const ks = ['eroeffnung', 'behelfe', 'skizze', 'beschreibung', 'abschluss', 'zustimmung'];
   return { done: ks.filter(k => stepDone(k, v)).length, total: ks.length };
 }
 function renderChrome() {
@@ -721,31 +723,42 @@ function personCard(b) {
   return card;
 }
 /* GFN-Behelfe bei der Eröffnung abhaken; angehakte stehen namentlich im Protokoll (Seite 1) */
-function behelfeVorhalten() {
+/* ---------- 2 Behelfe (GFN) vorhalten ---------- */
+VIEWS.behelfe = page => {
   const v = app.cur, L = isLocked();
-  const n = v.behelfe.filter(b => b.vorgehalten).length;
-  return h('div', { class: 'card' },
-    h('div', { class: 'card-head' },
-      h('div', {}, h('h2', {}, 'Vorgehaltene GFN'), h('p', { class: 'muted' }, 'Anhaken, was den Eigentümern gezeigt wurde. Steht so im Protokoll.')),
-      h('span', { class: 'pill ' + (n ? 'good' : '') }, `${n} von ${v.behelfe.length} vorgehalten`)),
-    !L && !isOpened() ? h('p', { class: 'muted', style: 'margin:0 0 8px;font-size:.88rem' }, 'Abhaken erst nach der Eröffnung. Ansehen geht schon vorher.') : null,
-    v.behelfe.length ? h('ul', { class: 'gfn-list' }, v.behelfe.map(b => h('li', {},
-      h('label', { class: 'check' },
-        h('input', { type: 'checkbox', checked: b.vorgehalten, disabled: L || !isOpened(), onchange: e => {
-          b.vorgehalten = e.target.checked; logEvent(`Behelf ${b.gz} ${b.vorgehalten ? 'vorgehalten' : 'nicht vorgehalten'}`); touch(); rerender();
-        } }),
-        h('span', {}, h('strong', { class: 'mono' }, b.gz || 'ohne GZ'), h('span', { class: 'muted' }, ` · ${b.planverfasser || 'Planverfasser unbekannt'}${b.anmerkung ? ' · ' + b.anmerkung : ''}`))),
-      b.pdf ? h('button', { class: 'btn small', type: 'button', onclick: () => Viewer.open({ blob: b.pdf, title: `Behelf ${b.gz} · ${b.planverfasser}` }) }, icon('zoom'), 'Ansehen')
-        : h('span', { class: 'muted', style: 'font-size:.85rem' }, 'ohne PDF'))))
-      : h('p', { class: 'muted' }, 'Keine Behelfe im Verhandlungspaket.'),
-    L ? null : h('div', { style: 'margin-top:10px' },
-      h('button', { class: 'btn small ghost', type: 'button', onclick: e => e.currentTarget.nextElementSibling.click() }, icon('plus'), 'GFN-Plan ergänzen (PDF)'),
-      h('input', { type: 'file', accept: 'application/pdf', hidden: true, onchange: e => {
-        const f = e.target.files[0]; if (!f) return;
-        v.behelfe.push({ id: uid(), planverfasser: '', gz: f.name.replace(/\.pdf$/i, ''), anmerkung: 'vor Ort ergänzt', vorgehalten: isOpened(), pdf: f });
-        logEvent(`Behelf ${f.name} ergänzt`); touch(true); rerender();
-      } })));
-}
+  const n = v.behelfe.filter(b => b.vorgehalten).length, alle = v.behelfe.length && n === v.behelfe.length;
+  const setze = (b, on) => { b.vorgehalten = on; logEvent(`Behelf ${b.gz} ${on ? 'vorgehalten' : 'nicht vorgehalten'}`); };
+  put(page,
+    lockedBanner(),
+    pageHead('Behelfe', L ? 'Das Protokoll ist gesperrt.' : 'Gegenstand darlegen, GFN zeigen und anhaken, was vorgehalten wurde. Die angehakten GFN stehen so im Protokoll.'),
+    h('div', { class: 'card opener behelfe-card' },
+      h('div', { class: 'opener-text', style: 'border-top:0;padding-top:0;margin-top:0' },
+        h('p', {}, eroeffnungsText(v)[1]),
+        n ? h('p', { class: 'behelfe-sel' }, v.behelfe.filter(x => x.vorgehalten).map(x => `${x.gz}${x.planverfasser ? ` (${x.planverfasser})` : ''}`).join(' · '))
+          : h('p', { class: 'muted' }, 'Noch kein GFN angehakt.'))),
+    h('div', { class: 'card' },
+      h('div', { class: 'card-head' },
+        h('div', {}, h('h2', {}, 'GFN und andere Behelfe'), h('p', { class: 'muted' }, 'Zum Ansehen antippen, Haken setzen, wenn vorgehalten.')),
+        h('span', { class: 'row', style: 'gap:8px' },
+          h('span', { class: 'pill ' + (n ? 'good' : '') }, `${n} von ${v.behelfe.length} vorgehalten`),
+          !L && v.behelfe.length > 1 ? h('button', { class: 'btn small ghost', type: 'button', onclick: () => {
+            v.behelfe.forEach(b => { if (b.vorgehalten === !!alle) setze(b, !alle); }); touch(); rerender();
+          } }, alle ? 'Alle abwählen' : 'Alle anhaken') : null)),
+      v.behelfe.length ? h('ul', { class: 'gfn-list' }, v.behelfe.map(b => h('li', { class: b.vorgehalten ? 'on' : '' },
+        h('label', { class: 'check' },
+          h('input', { type: 'checkbox', checked: b.vorgehalten, disabled: L, onchange: e => { setze(b, e.target.checked); touch(); rerender(); } }),
+          h('span', {}, h('strong', { class: 'mono' }, b.gz || 'ohne GZ'), h('span', { class: 'muted' }, ` · ${b.planverfasser || 'Planverfasser unbekannt'}${b.anmerkung ? ' · ' + b.anmerkung : ''}`))),
+        b.pdf ? h('button', { class: 'btn small', type: 'button', onclick: () => Viewer.open({ blob: b.pdf, title: `Behelf ${b.gz}${b.planverfasser ? ' · ' + b.planverfasser : ''}` }) }, icon('zoom'), 'Ansehen')
+          : h('span', { class: 'muted', style: 'font-size:.85rem' }, 'ohne PDF'))))
+        : h('p', { class: 'muted' }, 'Keine Behelfe im Verhandlungspaket.'),
+      L ? null : h('div', { style: 'margin-top:10px' },
+        h('button', { class: 'btn small ghost', type: 'button', onclick: e => e.currentTarget.nextElementSibling.click() }, icon('plus'), 'GFN-Plan ergänzen (PDF)'),
+        h('input', { type: 'file', accept: 'application/pdf', hidden: true, onchange: e => {
+          const f = e.target.files[0]; if (!f) return;
+          v.behelfe.push({ id: uid(), planverfasser: '', gz: f.name.replace(/\.pdf$/i, ''), anmerkung: 'vor Ort ergänzt', vorgehalten: true, pdf: f });
+          logEvent(`Behelf ${f.name} ergänzt`); touch(true); rerender();
+        } }))));
+};
 /* Eröffnungstext wie im Protokoll (Seite 1): steht auch in der Eröffnungskarte */
 function eroeffnungsText(v) {
   const ortKurz = (v.meta.ort || '').split(',')[0].trim();
@@ -784,7 +797,6 @@ VIEWS.eroeffnung = page => {
         field('Datum', m.datum, val => { m.datum = val; touch(); }, { type: 'date', disabled: L }),
         h('div', { class: 'field' }, h('label', { for: 'f-eroeffnung' }, 'Eröffnung (Uhrzeit)'), timeInput),
         field('Verhandlungsleiter', m.leiter, val => { m.leiter = val; touch(); }, { disabled: L }))),
-    behelfeVorhalten(),
     h('div', { class: 'page-head' },
       h('div', {}, h('h2', {}, 'Anwesende'),
         h('p', { class: 'lead' }, (isOpened() ? '' : 'Geht schon vor der Eröffnung. ') + 'Bei jedem Eigentümer „Anwesend“, „Vertreten“ oder „Abwesend“ antippen und die Identität wählen: P persönlich bekannt, A allgemein bekannt, L Lichtbildausweis.')),
@@ -796,11 +808,7 @@ VIEWS.eroeffnung = page => {
 };
 
 function eroeffnungKarte(v) {
-  const [a, b] = eroeffnungsText(v), gfn = v.behelfe.filter(x => x.vorgehalten);
-  return h('div', { class: 'opener-text' },
-    h('p', {}, a),
-    h('p', {}, b),
-    h('p', { class: 'muted' }, gfn.length ? gfn.map(x => `${x.gz}${x.planverfasser ? ` (${x.planverfasser})` : ''}`).join(' · ') : 'Behelfe unten anhaken, sobald sie vorgehalten wurden.'));
+  return h('div', { class: 'opener-text' }, h('p', {}, eroeffnungsText(v)[0]));
 }
 /* Personen ohne Einladungszeit: eine Zeit für alle setzen (z. B. wenn das Paket keine Zeiten enthielt) */
 function einladungFehlt() {
@@ -1047,7 +1055,7 @@ function pflichtpruefung(v) {
     ['Identitätsnachweis bei allen Anwesenden', anw.length > 0 && anw.every(b => b.idnachweis), 'eroeffnung'],
     ['Vollmacht bei allen anwesenden Vertretern', anw.filter(b => b.rolle === 'Vertreter').every(b => b.vollmacht), 'eroeffnung'],
     ['Eigentümer im Verzeichnis', owners(v).length > 0, 'eroeffnung'],
-    ['Mindestens ein Behelf vorgehalten', v.behelfe.some(b => b.vorgehalten), 'eroeffnung'],
+    ['Mindestens ein Behelf vorgehalten', v.behelfe.some(b => b.vorgehalten), 'behelfe'],
     ['Begehungsskizze vorhanden', !!v.skizze.pdf, 'skizze'],
     ['Beschreibung des Grenzverlaufs ausgefüllt', !!(v.beschreibung.text || '').trim(), 'beschreibung'],
     ['Schluss der Verhandlung (Uhrzeit) erfasst', !!v.meta.schluss, 'abschluss'],
