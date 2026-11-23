@@ -5,7 +5,7 @@
  */
 'use strict';
 
-const APP_VERSION = '0.9.19';
+const APP_VERSION = '0.9.20';
 const EGIZ_URL = 'https://pdf.egiz.gv.at/';
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'libs/pdf.worker.min.js';
 
@@ -1033,7 +1033,7 @@ VIEWS.beschreibung = page => {
       h('div', { class: 'field' }, h('label', { for: 'f-beschr' }, 'Beschreibung des Grenzverlaufs'), ta),
       L ? null : h('div', {}, h('button', { class: 'btn small ghost', type: 'button', onclick: () => { v.beschreibung.text = BESCHREIBUNG_VORLAGE; ta.value = v.beschreibung.text; grow(ta); touch(); toast('Text der Vorlage wiederhergestellt'); } }, 'Text der Vorlage wiederherstellen')),
       h('div', { class: 'stack', style: 'gap:8px' }, h('span', { class: 'lbl' }, 'Textbausteine antippen zum Einfügen'),
-        h('div', { class: 'row' }, TB.map(t => h('button', { class: 'btn small', type: 'button', disabled: L, title: t, onclick: () => {
+        h('div', { class: 'row' }, TB.map(t => h('button', { class: 'btn small tb', type: 'button', disabled: L, title: t, onclick: () => {
           if ((v.beschreibung.text || '').includes(t)) { toast('Dieser Textbaustein steht schon in der Beschreibung.'); return; }
           v.beschreibung.text = (v.beschreibung.text ? v.beschreibung.text.trimEnd() + '\n' : '') + t; ta.value = v.beschreibung.text; grow(ta); touch();
         } }, icon('plus'), t.length > 44 ? t.slice(0, 42) + '…' : t))))),
