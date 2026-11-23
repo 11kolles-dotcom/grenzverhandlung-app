@@ -31,8 +31,6 @@ function dropzone(box, multiple, onFiles) {
   box.onfocus = () => { pasteTarget = take; };
   box.onmouseleave = () => { if (document.activeElement !== box) pasteTarget = null; };
   box.onblur = () => { pasteTarget = null; };
-  const hint = document.createElement('span'); hint.className = 'hint small'; hint.textContent = 'oder kopieren und mit Strg+V einfügen (Maus über dem Feld)';
-  box.append(hint);
 }
 let pasteTarget = null;
 document.addEventListener('paste', e => {
@@ -74,11 +72,11 @@ dropzone($('#drop-beh'), true, fs => {
 
 /* 3 · Begehungsskizze */
 function drawSk() {
-  $('#sk').replaceChildren(...(state.skizze ? [el('li', {}, el('span', { class: 'tag' }, 'Skizze'), el('span', { style: 'flex:1;font-weight:600' }, state.skizze.name),
+  $('#sk').replaceChildren(...(state.skizze ? [el('li', {}, el('span', { class: 'tag' }, 'Plan'), el('span', { style: 'flex:1;font-weight:600' }, state.skizze.name),
     el('button', { type: 'button', class: 'x', title: 'Entfernen', 'aria-label': 'Entfernen', onclick: () => { state.skizze = null; drawSk(); check(); } }, '✕'))] : []));
-  $('#drop-sk').querySelector('strong').textContent = state.skizze ? 'Begehungsskizze ersetzen' : 'Begehungsskizze (PDF) hierher ziehen';
+  $('#drop-sk').querySelector('strong').textContent = state.skizze ? 'Begehungsplan ersetzen' : 'Begehungsplan (PDF) hierher ziehen';
 }
-dropzone($('#drop-sk'), false, fs => { if (fs.length > 1) toast('Nur eine Begehungsskizze möglich, die erste Datei wurde genommen.'); state.skizze = fs[0]; drawSk(); check(); });
+dropzone($('#drop-sk'), false, fs => { if (fs.length > 1) toast('Nur ein Begehungsplan möglich, die erste Datei wurde genommen.'); state.skizze = fs[0]; drawSk(); check(); });
 
 /* 4 · Weitere Unterlagen */
 function drawUnt() {
@@ -175,7 +173,7 @@ dropzone($('#drop-prot'), false, async fs => {
     state.kopf = { verhandlungsleiter: state.kopf.verhandlungsleiter, kanzlei: state.kopf.kanzlei, ...Object.fromEntries(Object.entries(r.kopf).filter(([, v]) => v)) };
     state.bet = r.people;
     box.classList.remove('big');
-    box.replaceChildren(el('span', { class: 'file-chip' }, '✓ ' + f.name), el('span', {}, '  · '), el('strong', {}, 'Anderes Protokoll einlesen'), box.querySelector('.hint'));
+    box.replaceChildren(el('span', { class: 'file-chip' }, '✓ ' + f.name), el('span', {}, '  · '), el('strong', {}, 'Anderes Protokoll einlesen'));
     drawProt(); check();
     toast(`GZ ${r.kopf.gz}: ${r.people.length} Eigentümer übernommen. Bitte kurz prüfen.`);
   } catch (e) { toast('Protokoll konnte nicht gelesen werden: ' + e.message); box.querySelector('strong').textContent = 'Protokoll (PDF) hierher ziehen'; }
@@ -195,7 +193,7 @@ function check() {
   $('#st-gfn').classList.toggle('done', state.beh.length > 0);
   $('#st-sk').classList.toggle('done', !!state.skizze);
   $('#st-unt').classList.toggle('done', state.unt.length > 0);
-  const parts = [state.prot ? `GZ ${state.kopf.gz} · ${state.bet.length} Eigentümer` : '', `${state.beh.length} GFN`, state.skizze ? 'Skizze' : 'ohne Skizze (am Tablet leeres Blatt)', `${state.unt.length} weitere Unterlagen`].filter(Boolean);
+  const parts = [state.prot ? `GZ ${state.kopf.gz} · ${state.bet.length} Eigentümer` : '', `${state.beh.length} GFN`, state.skizze ? 'Begehungsplan' : 'ohne Begehungsplan (am Tablet leeres Blatt)', `${state.unt.length} weitere Unterlagen`].filter(Boolean);
   st.className = p.length ? 'pk-err' : 'muted';
   st.textContent = p.length ? 'Noch offen: ' + p.join(' · ') : parts.join(' · ');
   $('#save').disabled = !state.prot;
