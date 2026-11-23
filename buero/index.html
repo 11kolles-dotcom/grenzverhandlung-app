@@ -76,6 +76,10 @@
   .pk-pair .pk-list li input:not(.nr) { flex: 1 1 100%; order: 2; }
   .step-h h2 { font-size: 1.15rem; }
   .pk { gap: 16px; }
+  /* PC: ganzer Block in der Bildschirmmitte (waagrecht und senkrecht, solange er hineinpasst) */
+  .pk { min-height: 100vh; min-height: 100dvh; box-sizing: border-box; justify-content: center; padding-top: 24px; padding-bottom: 104px; }
+  @media (max-height: 560px) { .pk { justify-content: flex-start; } }
+  @media (hover: none) and (pointer: coarse) { .drop .hint { display: none; } }
   /* je Feld eine Pastellfarbe: Titelleiste, Nummer, Ablagefeld */
   #st-prot { --pc: var(--p-rose); } #st-gfn { --pc: var(--p-sky); } #st-sk { --pc: var(--p-sage); } #st-unt { --pc: var(--p-butter); }
   .pk .card.step::before { background-color: var(--pc) !important; }
